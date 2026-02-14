@@ -18,12 +18,15 @@ import {
     PolarAngleAxis,
     PolarRadiusAxis,
     Radar,
-    ResponsiveContainer
+    ResponsiveContainer,
+    PieChart,
+    Pie,
+    Cell
 } from "recharts"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { ChartContainer } from "@/components/custom/ChartContainer"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { BrainCircuit, TrendingUp, Clock } from "lucide-react"
+import { BrainCircuit, TrendingUp, Clock, Users, Activity, AlertTriangle, TrendingDown } from "lucide-react"
 
 const riskTrendData = [
     { day: 'Mon', high: 12, medium: 24, low: 45 },
@@ -60,12 +63,105 @@ const aiPerformanceData = [
     { subject: 'AUC', A: 96, fullMark: 100 },
 ];
 
+// Summary KPI Data
+const kpiStats = [
+    { title: "Total Patients Triaged", value: "1,247", trend: "+12%", trendUp: true, icon: Users, color: "text-blue-500" },
+    { title: "Avg. Wait Time", value: "18m", trend: "-2m", trendUp: false, icon: Clock, color: "text-green-500" },
+    { title: "High-Risk Cases", value: "156", trend: "+8%", trendUp: true, icon: AlertTriangle, color: "text-red-500" },
+    { title: "AI Accuracy", value: "95%", trend: "+2%", trendUp: true, icon: Activity, color: "text-purple-500" },
+]
+
+// Risk Distribution for Donut Chart
+const riskDistributionData = [
+    { name: 'Low Risk', value: 580, color: '#22c55e' },
+    { name: 'Medium Risk', value: 380, color: '#f97316' },
+    { name: 'High Risk', value: 156, color: '#ef4444' },
+];
+
+// Hourly Triage Volume
+const hourlyTriageData = [
+    { hour: '6AM', patients: 12 },
+    { hour: '8AM', patients: 28 },
+    { hour: '10AM', patients: 45 },
+    { hour: '12PM', patients: 62 },
+    { hour: '2PM', patients: 55 },
+    { hour: '4PM', patients: 48 },
+    { hour: '6PM', patients: 42 },
+    { hour: '8PM', patients: 25 },
+    { hour: '10PM', patients: 15 },
+];
+
 export default function AnalyticsPage() {
     return (
         <div className="space-y-6">
             <div>
                 <h2 className="text-3xl font-bold tracking-tight">Hospital Analytics</h2>
                 <p className="text-muted-foreground">Deep insights into patient flow, risk trends, and AI model performance.</p>
+            </div>
+
+            {/* KPI Summary Stats */}
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                {kpiStats.map((kpi, index) => (
+                    <Card key={index} className="border-l-4 border-l-primary/50 hover:shadow-md transition-all">
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium">
+                                {kpi.title}
+                            </CardTitle>
+                            <kpi.icon className={`h-4 w-4 ${kpi.color}`} />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold">{kpi.value}</div>
+                            <p className="text-xs text-muted-foreground">
+                                <span className={kpi.trendUp ? "text-green-500" : "text-red-500"}>
+                                    {kpi.trend}
+                                </span>
+                                {" "}from last week
+                            </p>
+                        </CardContent>
+                    </Card>
+                ))}
+            </div>
+
+            {/* Charts Row 1 */}
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+                {/* Donut Chart - Risk Level Distribution */}
+                <ChartContainer title="Risk Level Distribution" description="Current patient risk analysis" className="col-span-3">
+                    <PieChart>
+                        <Pie
+                            data={riskDistributionData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={60}
+                            outerRadius={100}
+                            paddingAngle={5}
+                            dataKey="value"
+                        >
+                            {riskDistributionData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                        </Pie>
+                        <Tooltip />
+                        <Legend verticalAlign="bottom" height={36} />
+                    </PieChart>
+                </ChartContainer>
+
+                {/* Line Chart - Hourly Triage Volume */}
+                <ChartContainer title="Triage Volume per Hour" description="Patient admissions by hour" className="col-span-4">
+                    <LineChart data={hourlyTriageData}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="hour" tickLine={false} axisLine={false} />
+                        <YAxis tickLine={false} axisLine={false} />
+                        <Tooltip />
+                        <Line
+                            type="monotone"
+                            dataKey="patients"
+                            stroke="var(--primary)"
+                            strokeWidth={3}
+                            dot={{ r: 4, fill: "var(--background)", strokeWidth: 2 }}
+                            activeDot={{ r: 6 }}
+                        />
+                    </LineChart>
+                </ChartContainer>
             </div>
 
             <Tabs defaultValue="operations" className="space-y-4">
@@ -176,8 +272,6 @@ export default function AnalyticsPage() {
         </div>
     )
 }
-
-// Helper to color bars based on index or logic
 function FeatureCell({ index }: { index: number }) {
     const colors = ["#22c55e", "#84cc16", "#eab308", "#f97316", "#ef4444"]
     return <rect fill={colors[index % colors.length]} />
