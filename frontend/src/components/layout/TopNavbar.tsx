@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { LanguageSelector } from "@/components/ui/language-selector"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -33,6 +34,9 @@ export function TopNavbar() {
 
                 {/* Actions */}
                 <div className="flex items-center gap-3">
+                    {/* Language Selector */}
+                    <LanguageSelector />
+
                     <Button variant="ghost" size="icon" className="relative clay-button rounded-xl h-10 w-10 text-cyan-700 hover:text-cyan-900 border-0 bg-white">
                         <Bell className="h-5 w-5" />
                         <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-rose-500 border border-white"></span>

@@ -15,7 +15,9 @@ import {
     AlertCircle,
     CheckCircle2,
     Loader2,
-    Sparkles
+    Sparkles,
+    Mic,
+    Globe
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -23,6 +25,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { VoiceInput } from "@/components/ui/voice-input"
+import { useTranslation } from "@/lib/language-context"
 
 import { Progress } from "@/components/ui/progress"
 import {
@@ -74,10 +78,16 @@ interface FormData {
 
 export default function PatientIntakePage() {
     const router = useRouter()
+    const { t } = useTranslation()
     const [isSubmitting, setIsSubmitting] = React.useState(false)
     const [progress, setProgress] = React.useState(0)
     const [uploadedFile, setUploadedFile] = React.useState<File | null>(null)
     const [isDragging, setIsDragging] = React.useState(false)
+
+    // Voice input state for notes
+    const [notesLanguage, setNotesLanguage] = React.useState("en-US")
+    const [isNotesListening, setIsNotesListening] = React.useState(false)
+    const [notesRecognition, setNotesRecognition] = React.useState<any>(null)
 
     const [formData, setFormData] = React.useState<FormData>({
         age: "",
@@ -270,8 +280,8 @@ export default function PatientIntakePage() {
             {/* Header */}
             <div className="flex justify-between items-center">
                 <div>
-                    <h2 className="text-3xl font-bold tracking-tight">Patient Intake</h2>
-                    <p className="text-muted-foreground">Enter patient information for AI-powered triage analysis</p>
+                    <h2 className="text-3xl font-bold tracking-tight">{t("intake_title")}</h2>
+                    <p className="text-muted-foreground">{t("intake_subtitle")}</p>
                 </div>
                 <div className="flex items-center px-4 py-2 bg-primary/10 border border-primary/20 rounded-full shadow-sm">
                     <Sparkles className="w-4 h-4 mr-2 text-primary fill-primary/20" />
@@ -283,7 +293,7 @@ export default function PatientIntakePage() {
             <Card className="bg-primary/5 border-primary/20">
                 <CardContent className="py-4">
                     <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm font-medium">Form Completion</span>
+                        <span className="text-sm font-medium">{t("intake_form_completion")}</span>
                         <span className="text-sm text-muted-foreground">{progress}%</span>
                     </div>
                     <Progress value={progress} className="h-2" />
@@ -294,11 +304,11 @@ export default function PatientIntakePage() {
                 <TabsList className="grid w-full max-w-md grid-cols-2">
                     <TabsTrigger value="manual" className="flex items-center gap-2">
                         <User className="w-4 h-4" />
-                        Manual Entry
+                        {t("intake_manual_entry")}
                     </TabsTrigger>
                     <TabsTrigger value="upload" className="flex items-center gap-2">
                         <Upload className="w-4 h-4" />
-                        Upload EHR/EMR
+                        {t("intake_upload_ehr")}
                     </TabsTrigger>
                 </TabsList>
 
@@ -310,22 +320,23 @@ export default function PatientIntakePage() {
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
                                     <User className="w-5 h-5 text-primary" />
-                                    Patient Demographics
+                                    {t("intake_demographics")}
                                 </CardTitle>
-                                <CardDescription>Basic patient information</CardDescription>
+                                <CardDescription>{t("intake_basic_info")}</CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div className="space-y-2">
-                                        <Label htmlFor="name">Patient Name *</Label>
-                                        <Input
+                                        <Label htmlFor="name">{t("intake_name")} * <span className="text-xs text-muted-foreground">(Voice input enabled)</span></Label>
+                                        <VoiceInput
                                             id="name"
                                             value={formData.name}
-                                            onChange={(e) => updateField("name", e.target.value)}
+                                            onValueChange={(value) => updateField("name", value)}
+                                            placeholder="Enter or speak patient name"
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="age">Age *</Label>
+                                        <Label htmlFor="age">{t("intake_age")} *</Label>
                                         <Input
                                             id="age"
                                             type="number"
@@ -334,7 +345,7 @@ export default function PatientIntakePage() {
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="gender">Gender *</Label>
+                                        <Label htmlFor="gender">{t("intake_gender")} *</Label>
                                         <Select
                                             value={formData.gender}
                                             onValueChange={(value) => updateField("gender", value)}
@@ -343,10 +354,10 @@ export default function PatientIntakePage() {
                                                 <SelectValue placeholder="Select Gender" />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="male">Male</SelectItem>
-                                                <SelectItem value="female">Female</SelectItem>
-                                                <SelectItem value="other">Other</SelectItem>
-                                                <SelectItem value="prefer-not">Prefer not to say</SelectItem>
+                                                <SelectItem value="male">{t("intake_gender_male")}</SelectItem>
+                                                <SelectItem value="female">{t("intake_gender_female")}</SelectItem>
+                                                <SelectItem value="other">{t("intake_gender_other")}</SelectItem>
+                                                <SelectItem value="prefer-not">{t("intake_gender_prefer_not")}</SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>
@@ -360,7 +371,7 @@ export default function PatientIntakePage() {
                                 <div className="flex justify-between items-center">
                                     <CardTitle className="flex items-center gap-2">
                                         <Activity className="w-5 h-5 text-red-500" />
-                                        Vital Signs
+                                        {t("intake_vitals")}
                                     </CardTitle>
                                     <Button
                                         type="button"
@@ -380,7 +391,7 @@ export default function PatientIntakePage() {
                                         {isBluetoothConnected ? "Device Connected" : "Connect Wearable"}
                                     </Button>
                                 </div>
-                                <CardDescription>Current physiological measurements</CardDescription>
+                                <CardDescription>{t("intake_vitals_desc")}</CardDescription>
                                 {bluetoothError && (
                                     <p className="text-sm text-red-500 mt-2">{bluetoothError}</p>
                                 )}
@@ -388,7 +399,7 @@ export default function PatientIntakePage() {
                             <CardContent>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                                     <div className="space-y-2">
-                                        <Label htmlFor="bp-systolic">Blood Pressure (Systolic) *</Label>
+                                        <Label htmlFor="bp-systolic">{t("intake_bp_systolic")} *</Label>
                                         <div className="flex items-center gap-2">
                                             <Input
                                                 id="bp-systolic"
@@ -400,7 +411,7 @@ export default function PatientIntakePage() {
                                         </div>
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="bp-diastolic">Blood Pressure (Diastolic) *</Label>
+                                        <Label htmlFor="bp-diastolic">{t("intake_bp_diastolic")} *</Label>
                                         <div className="flex items-center gap-2">
                                             <Input
                                                 id="bp-diastolic"
@@ -412,7 +423,7 @@ export default function PatientIntakePage() {
                                         </div>
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="heart-rate">Heart Rate *</Label>
+                                        <Label htmlFor="heart-rate">{t("intake_heart_rate")} *</Label>
                                         <div className="flex items-center gap-2">
                                             <Input
                                                 id="heart-rate"
@@ -424,7 +435,7 @@ export default function PatientIntakePage() {
                                         </div>
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="temperature">Temperature *</Label>
+                                        <Label htmlFor="temperature">{t("intake_temperature")} *</Label>
                                         <div className="flex items-center gap-2">
                                             <Input
                                                 id="temperature"
@@ -437,7 +448,7 @@ export default function PatientIntakePage() {
                                         </div>
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="oxygen">Oxygen Saturation (SpO2) *</Label>
+                                        <Label htmlFor="oxygen">{t("intake_oxygen")} *</Label>
                                         <div className="flex items-center gap-2">
                                             <Input
                                                 id="oxygen"
@@ -449,7 +460,7 @@ export default function PatientIntakePage() {
                                         </div>
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="respiratory">Respiratory Rate</Label>
+                                        <Label htmlFor="respiratory">{t("intake_respiratory")}</Label>
                                         <div className="flex items-center gap-2">
                                             <Input
                                                 id="respiratory"
@@ -469,9 +480,9 @@ export default function PatientIntakePage() {
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
                                     <Stethoscope className="w-5 h-5 text-orange-500" />
-                                    Symptoms *
+                                    {t("intake_symptoms")} *
                                 </CardTitle>
-                                <CardDescription>Select all that apply</CardDescription>
+                                <CardDescription>{t("intake_symptoms_desc")}</CardDescription>
                             </CardHeader>
                             <CardContent>
                                 <div className="flex flex-wrap gap-2">
@@ -497,7 +508,7 @@ export default function PatientIntakePage() {
                                 {formData.symptoms.length === 0 && (
                                     <p className="text-sm text-muted-foreground mt-2">
                                         <AlertCircle className="w-4 h-4 inline mr-1" />
-                                        Please select at least one symptom
+                                        {t("msg_select_symptom")}
                                     </p>
                                 )}
                             </CardContent>
@@ -508,8 +519,8 @@ export default function PatientIntakePage() {
                         {/* Pre-existing Conditions */}
                         <Card className="mb-6">
                             <CardHeader>
-                                <CardTitle>Pre-existing Conditions</CardTitle>
-                                <CardDescription>Known medical history</CardDescription>
+                                <CardTitle>{t("intake_conditions")}</CardTitle>
+                                <CardDescription>{t("intake_conditions_desc")}</CardDescription>
                             </CardHeader>
                             <CardContent>
                                 <div className="flex flex-wrap gap-2">
@@ -531,15 +542,100 @@ export default function PatientIntakePage() {
                         {/* Additional Notes */}
                         <Card className="mb-6">
                             <CardHeader>
-                                <CardTitle>Additional Notes</CardTitle>
-                                <CardDescription>Any additional information about the patient condition</CardDescription>
+                                <CardTitle>{t("intake_notes")}</CardTitle>
+                                <CardDescription>{t("intake_notes_desc")}</CardDescription>
                             </CardHeader>
-                            <CardContent>
-                                <textarea
-                                    className="w-full min-h-[100px] p-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                                    value={formData.notes}
-                                    onChange={(e) => updateField("notes", e.target.value)}
-                                />
+                            <CardContent className="space-y-4">
+                                <div className="relative">
+                                    <Label htmlFor="notes">Additional Notes</Label>
+                                    <textarea
+                                        id="notes"
+                                        className="w-full min-h-[100px] p-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary mt-2"
+                                        value={formData.notes}
+                                        onChange={(e) => updateField("notes", e.target.value)}
+                                        placeholder="Enter notes or click the microphone to speak..."
+                                    />
+                                    <div className="flex gap-2 mt-2">
+                                        <Select
+                                            value={notesLanguage}
+                                            onValueChange={(value) => setNotesLanguage(value)}
+                                        >
+                                            <SelectTrigger className="w-[180px]">
+                                                <Globe className="w-3 h-3 mr-1" />
+                                                <SelectValue placeholder="Select Language" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                                                    Indian Languages
+                                                </div>
+                                                <SelectItem value="ta-IN">Tamil - தமிழ்</SelectItem>
+                                                <SelectItem value="te-IN">Telugu - తెలుగు</SelectItem>
+                                                <SelectItem value="hi-IN">Hindi - हिन्दी</SelectItem>
+                                                <SelectItem value="kn-IN">Kannada - ಕನ್ನಡ</SelectItem>
+                                                <SelectItem value="ml-IN">Malayalam - മലയാളം</SelectItem>
+                                                <SelectItem value="bn-IN">Bengali - বাংলা</SelectItem>
+                                                <SelectItem value="gu-IN">Gujarati - ગુજરાતી</SelectItem>
+                                                <SelectItem value="mr-IN">Marathi - मराठी</SelectItem>
+                                                <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground border-t mt-1 pt-1">
+                                                    World Languages
+                                                </div>
+                                                <SelectItem value="en-US">English (US)</SelectItem>
+                                                <SelectItem value="en-GB">English (UK)</SelectItem>
+                                                <SelectItem value="es-ES">Spanish - Español</SelectItem>
+                                                <SelectItem value="fr-FR">French - Français</SelectItem>
+                                                <SelectItem value="de-DE">German - Deutsch</SelectItem>
+                                                <SelectItem value="zh-CN">Chinese - 中文</SelectItem>
+                                                <SelectItem value="ja-JP">Japanese - 日本語</SelectItem>
+                                                <SelectItem value="ar-SA">Arabic - العربية</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            variant={isNotesListening ? "destructive" : "outline"}
+                                            onClick={() => {
+                                                const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition
+                                                if (!SpeechRecognitionAPI) {
+                                                    alert("Voice input not supported in this browser")
+                                                    return
+                                                }
+
+                                                if (isNotesListening) {
+                                                    notesRecognition?.stop()
+                                                    setIsNotesListening(false)
+                                                    return
+                                                }
+
+                                                const recognition = new SpeechRecognitionAPI()
+                                                recognition.continuous = true
+                                                recognition.interimResults = true
+                                                recognition.lang = notesLanguage
+
+                                                recognition.onresult = (event: any) => {
+                                                    const transcript = Array.from(event.results)
+                                                        .map((result: any) => result[0].transcript)
+                                                        .join("")
+                                                    updateField("notes", formData.notes + " " + transcript)
+                                                }
+                                                recognition.onend = () => setIsNotesListening(false)
+
+                                                recognition.start()
+                                                setNotesRecognition(recognition)
+                                                setIsNotesListening(true)
+                                            }}
+                                        >
+                                            {isNotesListening ? (
+                                                <>
+                                                    <Loader2 className="w-4 h-4 mr-1 animate-spin" /> Stop
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Mic className="w-4 h-4 mr-1" /> Voice
+                                                </>
+                                            )}
+                                        </Button>
+                                    </div>
+                                </div>
                             </CardContent>
                         </Card>
 
@@ -553,12 +649,12 @@ export default function PatientIntakePage() {
                             {isSubmitting ? (
                                 <>
                                     <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                                    Running AI Triage Analysis...
+                                    {t("intake_running_analysis")}
                                 </>
                             ) : (
                                 <>
                                     <Sparkles className="w-5 h-5 mr-2" />
-                                    Run Triage Analysis
+                                    {t("intake_run_analysis")}
                                 </>
                             )}
                         </Button>
@@ -569,8 +665,8 @@ export default function PatientIntakePage() {
                 <TabsContent value="upload" className="space-y-6">
                     <Card>
                         <CardHeader>
-                            <CardTitle>Upload EHR/EMR Document</CardTitle>
-                            <CardDescription>Upload a PDF document containing patient medical records</CardDescription>
+                            <CardTitle>{t("intake_upload_pdf")}</CardTitle>
+                            <CardDescription>{t("intake_upload_desc")}</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-6">
                             {/* Drop Zone */}
@@ -616,16 +712,17 @@ export default function PatientIntakePage() {
                                         <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
                                         <p className="text-lg font-medium">Upload EHR/EMR Document or click to browse</p>
                                         <p className="text-sm text-muted-foreground mt-2">
-                                            Supports PDF files up to 10MB
+                                            {t("intake_supports_pdf")}
                                         </p>
-                                    </label>
-                                )}
-                            </div>
+                                    </label >
+                                )
+                                }
+                            </div >
 
                             {/* Manual Entry Prompt */}
-                            <div className="text-center">
+                            < div className="text-center" >
                                 <p className="text-sm text-muted-foreground mb-4">
-                                    Or enter basic information to complement the document
+                                    {t("intake_complement_doc")}
                                 </p>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-xl mx-auto">
                                     <Input
@@ -653,31 +750,32 @@ export default function PatientIntakePage() {
                                         </SelectContent>
                                     </Select>
                                 </div>
-                            </div>
+                            </div >
 
                             {/* Submit Button */}
-                            <Button
+                            < Button
                                 size="lg"
                                 className="w-full"
                                 disabled={!uploadedFile || isSubmitting}
                                 onClick={handleSubmit}
                             >
-                                {isSubmitting ? (
-                                    <>
-                                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                                        Processing EHR Document...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Sparkles className="w-5 h-5 mr-2" />
-                                        Run AI Triage Analysis
-                                    </>
-                                )}
-                            </Button>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
-            </Tabs>
-        </div>
+                                {
+                                    isSubmitting ? (
+                                        <>
+                                            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                                            {t("intake_processing")}
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Sparkles className="w-5 h-5 mr-2" />
+                                            Run AI Triage Analysis
+                                        </>
+                                    )}
+                            </Button >
+                        </CardContent >
+                    </Card >
+                </TabsContent >
+            </Tabs >
+        </div >
     )
 }
