@@ -5,6 +5,7 @@ import Link from "next/link"
 import { usePathname, useSearchParams } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { useTranslation } from "@/lib/language-context"
 import {
     Menu,
     X,
@@ -13,24 +14,25 @@ import {
 } from "lucide-react"
 import { mockPatients } from "@/lib/mockData"
 
-const sidebarItems = [
-    { href: "/", label: "Dashboard" },
-    { href: "/intake", label: "Patient Intake" },
-    // "Live Triage" is handled custom
-    { href: "/patients", label: "Patients" },
-    { href: "/analytics", label: "Analytics" },
-    { href: "/settings", label: "Settings" },
-]
-
 export function Sidebar() {
     const pathname = usePathname()
     const searchParams = useSearchParams()
+    const { t } = useTranslation()
     const activePatientId = searchParams.get("id")
     const [isOpen, setIsOpen] = React.useState(false) // Mobile sidebar state
     const [isTriageOpen, setIsTriageOpen] = React.useState(true) // Triage sub-menu state
 
     // Check if we are on the triage page
     const isTriageActive = pathname === "/triage"
+
+    const sidebarItems = [
+        { href: "/", label: t("nav_home") },
+        { href: "/intake", label: t("nav_intake") },
+        // "Live Triage" is handled custom
+        { href: "/patients", label: t("nav_patients") },
+        { href: "/analytics", label: t("nav_analytics") },
+        { href: "/settings", label: t("nav_settings") },
+    ]
 
     return (
         <>
