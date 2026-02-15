@@ -23,7 +23,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Slider } from "@/components/ui/slider"
+
 import { Progress } from "@/components/ui/progress"
 import {
     Select,
@@ -68,7 +68,6 @@ interface FormData {
     conditions: string[]
 
     // Additional
-    painLevel: number
     notes: string
 }
 
@@ -91,7 +90,6 @@ export default function PatientIntakePage() {
         respiratoryRate: "",
         symptoms: [],
         conditions: [],
-        painLevel: 0,
         notes: ""
     })
 
@@ -241,7 +239,6 @@ export default function PatientIntakePage() {
                                         <Label htmlFor="name">Patient Name *</Label>
                                         <Input
                                             id="name"
-                                            placeholder="Enter full name"
                                             value={formData.name}
                                             onChange={(e) => updateField("name", e.target.value)}
                                         />
@@ -251,7 +248,6 @@ export default function PatientIntakePage() {
                                         <Input
                                             id="age"
                                             type="number"
-                                            placeholder="Years"
                                             value={formData.age}
                                             onChange={(e) => updateField("age", e.target.value)}
                                         />
@@ -263,7 +259,7 @@ export default function PatientIntakePage() {
                                             onValueChange={(value) => updateField("gender", value)}
                                         >
                                             <SelectTrigger>
-                                                <SelectValue placeholder="Select gender" />
+                                                <SelectValue placeholder="Select Gender" />
                                             </SelectTrigger>
                                             <SelectContent>
                                                 <SelectItem value="male">Male</SelectItem>
@@ -294,7 +290,6 @@ export default function PatientIntakePage() {
                                             <Input
                                                 id="bp-systolic"
                                                 type="number"
-                                                placeholder="120"
                                                 value={formData.bloodPressureSystolic}
                                                 onChange={(e) => updateField("bloodPressureSystolic", e.target.value)}
                                             />
@@ -307,7 +302,6 @@ export default function PatientIntakePage() {
                                             <Input
                                                 id="bp-diastolic"
                                                 type="number"
-                                                placeholder="80"
                                                 value={formData.bloodPressureDiastolic}
                                                 onChange={(e) => updateField("bloodPressureDiastolic", e.target.value)}
                                             />
@@ -320,7 +314,6 @@ export default function PatientIntakePage() {
                                             <Input
                                                 id="heart-rate"
                                                 type="number"
-                                                placeholder="72"
                                                 value={formData.heartRate}
                                                 onChange={(e) => updateField("heartRate", e.target.value)}
                                             />
@@ -334,7 +327,6 @@ export default function PatientIntakePage() {
                                                 id="temperature"
                                                 type="number"
                                                 step="0.1"
-                                                placeholder="98.6"
                                                 value={formData.temperature}
                                                 onChange={(e) => updateField("temperature", e.target.value)}
                                             />
@@ -347,7 +339,6 @@ export default function PatientIntakePage() {
                                             <Input
                                                 id="oxygen"
                                                 type="number"
-                                                placeholder="98"
                                                 value={formData.oxygenSaturation}
                                                 onChange={(e) => updateField("oxygenSaturation", e.target.value)}
                                             />
@@ -360,7 +351,6 @@ export default function PatientIntakePage() {
                                             <Input
                                                 id="respiratory"
                                                 type="number"
-                                                placeholder="16"
                                                 value={formData.respiratoryRate}
                                                 onChange={(e) => updateField("respiratoryRate", e.target.value)}
                                             />
@@ -410,33 +400,7 @@ export default function PatientIntakePage() {
                             </CardContent>
                         </Card>
 
-                        {/* Pain Level */}
-                        <Card className="mb-6">
-                            <CardHeader>
-                                <CardTitle>Pain Assessment</CardTitle>
-                                <CardDescription>Current pain level (0 = No Pain, 10 = Worst Pain)</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-4">
-                                    <div className="flex items-center gap-4">
-                                        <span className="text-2xl font-bold w-8">0</span>
-                                        <Slider
-                                            value={[formData.painLevel]}
-                                            onValueChange={([value]) => updateField("painLevel", value)}
-                                            max={10}
-                                            step={1}
-                                            className="flex-1"
-                                        />
-                                        <span className="text-2xl font-bold w-8">10</span>
-                                    </div>
-                                    <div className="text-center">
-                                        <Badge variant={formData.painLevel >= 7 ? "destructive" : formData.painLevel >= 4 ? "default" : "secondary"}>
-                                            Current: {formData.painLevel}/10
-                                        </Badge>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
+
 
                         {/* Pre-existing Conditions */}
                         <Card className="mb-6">
@@ -470,7 +434,6 @@ export default function PatientIntakePage() {
                             <CardContent>
                                 <textarea
                                     className="w-full min-h-[100px] p-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                                    placeholder="Enter any additional symptoms, observations, or relevant medical history..."
                                     value={formData.notes}
                                     onChange={(e) => updateField("notes", e.target.value)}
                                 />

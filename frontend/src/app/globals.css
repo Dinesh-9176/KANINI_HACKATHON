@@ -1,0 +1,224 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@theme {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+
+  --shadow-soft: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+
+  /* Helper for sidebar if needed */
+  --color-sidebar: var(--card);
+  --color-sidebar-foreground: var(--card-foreground);
+  --color-sidebar-primary: var(--primary);
+  --color-sidebar-primary-foreground: var(--primary-foreground);
+  --color-sidebar-accent: var(--accent);
+  --color-sidebar-accent-foreground: var(--accent-foreground);
+  --color-sidebar-border: var(--border);
+  --color-sidebar-ring: var(--ring);
+}
+
+@custom-variant dark (&:is(.dark *));
+
+
+
+@layer base {
+  :root {
+    /* Claymorphism - White & Dark Cyan Palette */
+    --background: hsl(180 20% 97%);
+    /* Very faint cyan-white #F0F9F9 */
+    --foreground: hsl(183 100% 15%);
+    /* Deep Dark Cyan #004D4D */
+
+    --card: hsl(0 0% 100%);
+    --card-foreground: hsl(183 100% 15%);
+
+    --popover: hsl(0 0% 100%);
+    --popover-foreground: hsl(183 100% 15%);
+
+    --primary: hsl(183 100% 25%);
+    /* Dark Cyan #008080 */
+    --primary-foreground: hsl(0 0% 100%);
+
+    --secondary: hsl(180 25% 90%);
+    /* Light Cyan-Grey */
+    --secondary-foreground: hsl(183 100% 15%);
+
+    --muted: hsl(180 20% 94%);
+    --muted-foreground: hsl(180 15% 50%);
+
+    --accent: hsl(180 25% 90%);
+    --accent-foreground: hsl(183 100% 15%);
+
+    --destructive: hsl(0 84.2% 60.2%);
+    --destructive-foreground: hsl(0 0% 100%);
+
+    --border: hsl(180 20% 88%);
+    --input: hsl(180 20% 88%);
+    --ring: hsl(183 100% 25%);
+
+    --radius: 1.5rem;
+  }
+
+  .dark {
+    /* Claymorphism - Soft Dark Mode */
+    --background: hsl(222 15% 15%);
+    /* #202428 Soft dark grey */
+    --foreground: hsl(210 20% 98%);
+
+    --card: hsl(222 15% 18%);
+    /* Slightly lighter than bg */
+    --card-foreground: hsl(210 20% 98%);
+
+    --popover: hsl(222 15% 18%);
+    --popover-foreground: hsl(210 20% 98%);
+
+    --primary: hsl(217.2 91.2% 59.8%);
+    --primary-foreground: hsl(222.2 47.4% 11.2%);
+
+    --secondary: hsl(217.2 32.6% 17.5%);
+    --secondary-foreground: hsl(210 40% 98%);
+
+    --muted: hsl(217.2 32.6% 17.5%);
+    --muted-foreground: hsl(215 20.2% 65.1%);
+
+    --accent: hsl(217.2 32.6% 17.5%);
+    --accent-foreground: hsl(210 40% 98%);
+
+    --destructive: hsl(0 62.8% 30.6%);
+    --destructive-foreground: hsl(210 40% 98%);
+
+    --border: hsl(217.2 32.6% 17.5%);
+    --input: hsl(217.2 32.6% 17.5%);
+    --ring: hsl(212.7 26.8% 83.9%);
+  }
+
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .clay-card {
+    background: #ffffff;
+    border-radius: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    box-shadow:
+      12px 12px 24px rgba(176, 190, 197, 0.2),
+      /* Soft shadow */
+      -12px -12px 24px rgba(255, 255, 255, 0.7);
+    /* Highlight */
+  }
+
+  .dark .clay-card {
+    background: #2a2e35;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    box-shadow:
+      8px 8px 16px rgba(0, 0, 0, 0.4),
+      -4px -4px 12px rgba(255, 255, 255, 0.05);
+  }
+
+  .clay-button {
+    transition: all 0.2s ease;
+    box-shadow: 6px 6px 12px rgba(176, 190, 197, 0.2), -6px -6px 12px rgba(255, 255, 255, 0.8);
+  }
+
+  .clay-button:active {
+    box-shadow: inset 4px 4px 8px rgba(176, 190, 197, 0.2), inset -4px -4px 8px rgba(255, 255, 255, 0.5);
+    transform: scale(0.98);
+  }
+
+  .dark .clay-button {
+    box-shadow: 6px 6px 12px rgba(0, 0, 0, 0.3), -4px -4px 10px rgba(255, 255, 255, 0.05);
+  }
+
+  .dark .clay-button:active {
+    box-shadow: inset 4px 4px 8px rgba(0, 0, 0, 0.3), inset -2px -2px 6px rgba(255, 255, 255, 0.05);
+  }
+
+  .clay-inset {
+    background: #F0F9F9;
+    box-shadow: inset 6px 6px 12px rgba(164, 188, 188, 0.25), inset -6px -6px 12px rgba(255, 255, 255, 0.9);
+    border-radius: 16px;
+  }
+
+  .dark .clay-inset {
+    background: #1a1d21;
+    box-shadow: inset 4px 4px 10px rgba(0, 0, 0, 0.5), inset -2px -2px 8px rgba(255, 255, 255, 0.05);
+  }
+}
+
+@keyframes ecg-scroll {
+  0% {
+    transform: translateX(0);
+  }
+
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-ecg {
+  animation: ecg-scroll 2s linear infinite;
+}
+
+body {
+  font-family: 'Tahoma', Geneva, Verdana, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  /* Prevent horizontal scroll from entry animations */
+}
+
+/* Custom scrollbar for better aesthetics */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}

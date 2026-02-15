@@ -62,7 +62,7 @@ const kpiData = [
     trend: "+4%",
     trendUp: true,
     icon: TrendingUp,
-    color: "text-pink-500"
+    color: "text-primary"
   },
 ]
 
