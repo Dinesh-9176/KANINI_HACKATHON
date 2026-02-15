@@ -23,7 +23,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Slider } from "@/components/ui/slider"
 import { Progress } from "@/components/ui/progress"
 import {
     Select,
@@ -68,9 +67,10 @@ interface FormData {
     conditions: string[]
 
     // Additional
-    painLevel: number
     notes: string
 }
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
 export default function PatientIntakePage() {
     const router = useRouter()
@@ -78,6 +78,7 @@ export default function PatientIntakePage() {
     const [progress, setProgress] = React.useState(0)
     const [uploadedFile, setUploadedFile] = React.useState<File | null>(null)
     const [isDragging, setIsDragging] = React.useState(false)
+    const [error, setError] = React.useState<string | null>(null)
 
     const [formData, setFormData] = React.useState<FormData>({
         age: "",
@@ -91,7 +92,6 @@ export default function PatientIntakePage() {
         respiratoryRate: "",
         symptoms: [],
         conditions: [],
-        painLevel: 0,
         notes: ""
     })
 
@@ -147,7 +147,7 @@ export default function PatientIntakePage() {
 
     const calculateProgress = () => {
         let filled = 0
-        const total = 12 // Number of required fields
+        const total = 11
 
         if (formData.name) filled++
         if (formData.age) filled++
@@ -171,12 +171,45 @@ export default function PatientIntakePage() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setIsSubmitting(true)
+        setError(null)
 
-        // Simulate AI triage processing
-        await new Promise(resolve => setTimeout(resolve, 2000))
+        try {
+            const requestBody = {
+                name: formData.name,
+                age: parseInt(formData.age),
+                gender: formData.gender,
+                blood_pressure_systolic: formData.bloodPressureSystolic ? parseInt(formData.bloodPressureSystolic) : null,
+                blood_pressure_diastolic: formData.bloodPressureDiastolic ? parseInt(formData.bloodPressureDiastolic) : null,
+                heart_rate: formData.heartRate ? parseInt(formData.heartRate) : null,
+                temperature: formData.temperature ? parseFloat(formData.temperature) : null,
+                oxygen_saturation: formData.oxygenSaturation ? parseInt(formData.oxygenSaturation) : null,
+                respiratory_rate: formData.respiratoryRate ? parseInt(formData.respiratoryRate) : null,
+                symptoms: formData.symptoms,
+                conditions: formData.conditions,
+                notes: formData.notes,
+            }
 
-        // Navigate to triage page with result
-        router.push("/triage")
+            const response = await fetch(`${API_BASE_URL}/api/triage`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(requestBody),
+            })
+
+            if (!response.ok) {
+                throw new Error(`Triage API error: ${response.status}`)
+            }
+
+            const triageResult = await response.json()
+
+            // Store result in sessionStorage and navigate to triage page
+            sessionStorage.setItem("triageResult", JSON.stringify(triageResult))
+            router.push("/triage?source=intake")
+        } catch (err) {
+            console.error("Triage API error:", err)
+            setError(err instanceof Error ? err.message : "Failed to run triage analysis")
+        } finally {
+            setIsSubmitting(false)
+        }
     }
 
     const isFormValid = () => {
@@ -210,6 +243,18 @@ export default function PatientIntakePage() {
                     <Progress value={progress} className="h-2" />
                 </CardContent>
             </Card>
+
+            {/* Error Display */}
+            {error && (
+                <Card className="border-red-500 bg-red-50 dark:bg-red-900/20">
+                    <CardContent className="py-4">
+                        <p className="text-sm text-red-600 dark:text-red-400 flex items-center gap-2">
+                            <AlertCircle className="w-4 h-4" />
+                            {error}
+                        </p>
+                    </CardContent>
+                </Card>
+            )}
 
             <Tabs defaultValue="manual" className="space-y-6">
                 <TabsList className="grid w-full max-w-md grid-cols-2">
@@ -407,34 +452,6 @@ export default function PatientIntakePage() {
                                         Please select at least one symptom
                                     </p>
                                 )}
-                            </CardContent>
-                        </Card>
-
-                        {/* Pain Level */}
-                        <Card className="mb-6">
-                            <CardHeader>
-                                <CardTitle>Pain Assessment</CardTitle>
-                                <CardDescription>Current pain level (0 = No Pain, 10 = Worst Pain)</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-4">
-                                    <div className="flex items-center gap-4">
-                                        <span className="text-2xl font-bold w-8">0</span>
-                                        <Slider
-                                            value={[formData.painLevel]}
-                                            onValueChange={([value]) => updateField("painLevel", value)}
-                                            max={10}
-                                            step={1}
-                                            className="flex-1"
-                                        />
-                                        <span className="text-2xl font-bold w-8">10</span>
-                                    </div>
-                                    <div className="text-center">
-                                        <Badge variant={formData.painLevel >= 7 ? "destructive" : formData.painLevel >= 4 ? "default" : "secondary"}>
-                                            Current: {formData.painLevel}/10
-                                        </Badge>
-                                    </div>
-                                </div>
                             </CardContent>
                         </Card>
 
