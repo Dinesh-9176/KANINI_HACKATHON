@@ -6,6 +6,8 @@ from contextlib import asynccontextmanager
 
 from app.routes.triage import router as triage_router
 from app.routes import dashboard
+from app.routes.ehr import router as ehr_router
+from app.routes.patients import router as patients_router
 from app.init_db import init_db
 
 @asynccontextmanager
@@ -24,7 +26,7 @@ app = FastAPI(
 # CORS middleware for frontend communication
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3001", "http://127.0.0.1:3001"],
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://192.168.19.41:3000", "http://localhost:3001", "http://127.0.0.1:3001"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -33,6 +35,14 @@ app.add_middleware(
 # Include routes
 app.include_router(triage_router, prefix="/api")
 app.include_router(dashboard.router, prefix="/api")
+app.include_router(ehr_router, prefix="/api")
+app.include_router(patients_router, prefix="/api")
+
+from app.routes.resources import router as resources_router
+app.include_router(resources_router, prefix="/api")
+
+from app.routes.voice import router as voice_router
+app.include_router(voice_router, prefix="/api")
 
 
 @app.get("/")

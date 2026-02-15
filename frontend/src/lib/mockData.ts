@@ -16,6 +16,10 @@ export interface Patient {
     department: string
     confidence: number
     symptoms: string[]
+    estimatedLosDays?: number
+    losConfidence?: number
+    departmentId?: string
+    departmentName?: string
     vitals: {
         hr: number
         bp: string

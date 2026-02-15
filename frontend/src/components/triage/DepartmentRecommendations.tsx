@@ -18,6 +18,7 @@ import {
     DialogFooter,
     DialogClose,
 } from "@/components/ui/dialog"
+import { fetchDepartments, type Department as APIDepartment } from "@/lib/api"
 
 interface Department {
     id: string
@@ -236,16 +237,37 @@ export function DepartmentRecommendations({ recommendedDept }: DepartmentRecomme
     const [isTransferring, setIsTransferring] = React.useState(false)
     const [transferredDeptId, setTransferredDeptId] = React.useState<string | null>(null)
     const [statusMessage, setStatusMessage] = React.useState<string | null>(null)
+    const [apiDepts, setApiDepts] = React.useState<APIDepartment[]>([])
+
+    React.useEffect(() => {
+        fetchDepartments()
+            .then(setApiDepts)
+            .catch(() => {}) // Fall back to hardcoded
+    }, [])
 
     const departments = React.useMemo(() => {
+        // Use API data if available, otherwise fallback to hardcoded
+        const source: Department[] = apiDepts.length > 0
+            ? apiDepts.map(d => ({
+                id: d.id,
+                name: d.name,
+                capacity: d.capacity_pct ?? Math.floor(Math.random() * 60 + 20),
+                waitTime: d.wait_time_mins ?? Math.floor(Math.random() * 30 + 5),
+                isRecommended: false,
+                description: d.description || "",
+                doctors: d.active_doctors ?? Math.floor(Math.random() * 6 + 2),
+                isEmergency: d.is_emergency,
+            }))
+            : DEPARTMENTS
+
         if (recommendedDept) {
-            return DEPARTMENTS.map(dept => ({
+            return source.map(dept => ({
                 ...dept,
-                isRecommended: dept.id === recommendedDept
+                isRecommended: dept.id === recommendedDept,
             }))
         }
-        return DEPARTMENTS
-    }, [recommendedDept])
+        return source
+    }, [recommendedDept, apiDepts])
 
     const recommended = departments.find(d => d.isRecommended)
 

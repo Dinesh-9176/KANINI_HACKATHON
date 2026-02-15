@@ -164,7 +164,7 @@ export default function DashboardPage() {
 <body>
   <div class="header">
     <div class="date">Generated<br><strong>${reportDate} at ${reportTime}</strong></div>
-    <h1>🏥 Hospital Dashboard Report</h1>
+    <h1>Hospital Dashboard Report</h1>
     <div class="sub">Hospital System — Daily Performance Summary</div>
   </div>
 

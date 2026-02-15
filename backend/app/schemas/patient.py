@@ -24,6 +24,11 @@ class ContributingFactor(BaseModel):
     isPositive: bool
 
 
+class TopDisease(BaseModel):
+    disease: str
+    probability: float
+
+
 class TriageResponse(BaseModel):
     patient_id: str
     name: str
@@ -34,6 +39,9 @@ class TriageResponse(BaseModel):
     department: str
     confidence: int  # 0-100
     predicted_disease: str
+    top_diseases: list[TopDisease] = []
     contributing_factors: list[ContributingFactor]
     waiting_time: int  # estimated minutes
+    estimated_los_days: int  # AI predicted length of stay
+    los_confidence: float  # 0.0 - 1.0
     vitals: dict  # pass back the vitals for display

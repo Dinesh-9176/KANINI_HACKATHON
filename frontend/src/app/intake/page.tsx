@@ -17,7 +17,8 @@ import {
     Loader2,
     Sparkles,
     Mic,
-    Globe
+    Globe,
+    Watch
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -27,7 +28,6 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { VoiceInput } from "@/components/ui/voice-input"
 import { useTranslation } from "@/lib/language-context"
-
 import { Progress } from "@/components/ui/progress"
 import {
     Select,
@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
 import { useBluetoothDevice } from "@/hooks/useBluetoothDevice"
+import { WearableSimulator } from "@/components/triage/WearableSimulator"
 
 // Common symptoms for multi-select
 const COMMON_SYMPTOMS = [
@@ -126,6 +127,10 @@ export default function PatientIntakePage() {
         }))
     }
 
+    const [ehrParsedData, setEhrParsedData] = React.useState<any>(null)
+    const [ehrParsing, setEhrParsing] = React.useState(false)
+    const [ehrError, setEhrError] = React.useState<string | null>(null)
+
     const handleDragOver = (e: React.DragEvent) => {
         e.preventDefault()
         setIsDragging(true)
@@ -139,14 +144,57 @@ export default function PatientIntakePage() {
         e.preventDefault()
         setIsDragging(false)
         const files = e.dataTransfer.files
-        if (files.length > 0 && files[0].type === "application/pdf") {
-            setUploadedFile(files[0])
+        if (files.length > 0) {
+            const file = files[0]
+            const name = file.name.toLowerCase()
+            if (name.endsWith(".docx") || name.endsWith(".doc")) {
+                setUploadedFile(file)
+                parseEhrFile(file)
+            }
         }
     }
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
-            setUploadedFile(e.target.files[0])
+            const file = e.target.files[0]
+            setUploadedFile(file)
+            parseEhrFile(file)
+        }
+    }
+
+    const parseEhrFile = async (file: File) => {
+        setEhrParsing(true)
+        setEhrError(null)
+        setEhrParsedData(null)
+        try {
+            const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+            const fd = new FormData()
+            fd.append("file", file)
+            const res = await fetch(`${API_URL}/api/parse-ehr`, {
+                method: "POST",
+                body: fd,
+            })
+            if (!res.ok) {
+                const err = await res.json()
+                throw new Error(err.detail || "Failed to parse EHR document")
+            }
+            const data = await res.json()
+            setEhrParsedData(data)
+            // Pre-fill form fields from parsed EHR data
+            if (data.name) updateField("name", data.name)
+            if (data.age) updateField("age", String(data.age))
+            if (data.gender) updateField("gender", data.gender)
+            if (data.blood_pressure_systolic) updateField("bloodPressureSystolic", String(data.blood_pressure_systolic))
+            if (data.blood_pressure_diastolic) updateField("bloodPressureDiastolic", String(data.blood_pressure_diastolic))
+            if (data.heart_rate) updateField("heartRate", String(data.heart_rate))
+            if (data.temperature) updateField("temperature", String(data.temperature))
+            if (data.oxygen_saturation) updateField("oxygenSaturation", String(data.oxygen_saturation))
+            if (data.respiratory_rate) updateField("respiratoryRate", String(data.respiratory_rate))
+            if (data.notes) updateField("notes", data.notes)
+        } catch (err: any) {
+            setEhrError(err.message || "Failed to parse EHR")
+        } finally {
+            setEhrParsing(false)
         }
     }
 
@@ -196,73 +244,52 @@ export default function PatientIntakePage() {
         setIsSubmitting(true)
 
         try {
-            // Prepare payload for backend
+            // Build the request payload
+            // If EHR was parsed, merge its symptoms/conditions with any manual selections
+            const ehrSymptoms = ehrParsedData?.symptoms || []
+            const allSymptoms = [...new Set([...formData.symptoms, ...ehrSymptoms])]
+            const ehrConditions = ehrParsedData?.conditions || []
+            const allConditions = [...new Set([...formData.conditions, ...ehrConditions])]
+
             const payload = {
                 name: formData.name,
-                age: parseInt(formData.age) || 0,
+                age: parseInt(formData.age),
                 gender: formData.gender,
-                blood_pressure_systolic: parseInt(formData.bloodPressureSystolic) || 120,
-                blood_pressure_diastolic: parseInt(formData.bloodPressureDiastolic) || 80,
-                heart_rate: parseInt(formData.heartRate) || 80,
-                temperature: parseFloat(formData.temperature) || 98.6,
-                oxygen_saturation: parseInt(formData.oxygenSaturation) || 98,
-                respiratory_rate: parseInt(formData.respiratoryRate) || 16,
-                symptoms: formData.symptoms,
-                conditions: formData.conditions,
-                notes: formData.notes
+                blood_pressure_systolic: formData.bloodPressureSystolic ? parseInt(formData.bloodPressureSystolic) : null,
+                blood_pressure_diastolic: formData.bloodPressureDiastolic ? parseInt(formData.bloodPressureDiastolic) : null,
+                heart_rate: formData.heartRate ? parseInt(formData.heartRate) : null,
+                temperature: formData.temperature ? parseFloat(formData.temperature) : null,
+                oxygen_saturation: formData.oxygenSaturation ? parseInt(formData.oxygenSaturation) : null,
+                respiratory_rate: formData.respiratoryRate ? parseInt(formData.respiratoryRate) : null,
+                symptoms: allSymptoms,
+                conditions: allConditions,
+                notes: formData.notes,
             }
 
-            const response = await fetch('http://localhost:8000/api/triage', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+            const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+            const res = await fetch(`${API_URL}/api/triage`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload),
             })
 
-            if (!response.ok) {
-                throw new Error('Failed to submit triage data')
+            if (!res.ok) {
+                const err = await res.json()
+                throw new Error(err.detail || "Triage analysis failed")
             }
 
-            const data = await response.json()
+            const triageResult = await res.json()
 
-            // Transform backend response to frontend Patient interface
-            const patientData = {
-                id: data.patient_id,
-                name: data.name,
-                age: data.age,
-                gender: data.gender,
-                riskLevel: data.risk_level, // backend: "high" | "medium" | "low"
-                priorityScore: data.priority_score,
-                waitingTime: data.waiting_time,
-                department: data.department,
-                confidence: data.confidence,
-                symptoms: formData.symptoms, // Carry over from input
-                vitals: {
-                    hr: parseInt(data.vitals.heartRate) || 0,
-                    bp: data.vitals.bloodPressure, // Backend sends "120/80" string
-                    spo2: parseInt(data.vitals.oxygenSaturation) || 0,
-                    temp: parseFloat(data.vitals.temperature) || 0
-                },
-                // Backend AI analysis data
-                contributingFactors: data.contributing_factors?.map((f: any) => ({
-                    name: f.name,
-                    value: f.value,
-                    impact: f.impact,
-                    isPositive: f.isPositive ?? f.is_positive
-                })) || [],
-                predictedDisease: data.predicted_disease
-            }
+            // Store the result for the triage page to read
+            localStorage.setItem("triageResult", JSON.stringify({
+                ...triageResult,
+                symptoms: allSymptoms,
+            }))
 
-            // Save to local storage for the Triage page to access
-            localStorage.setItem("latestPatient", JSON.stringify(patientData))
-
-            // Navigate to triage page with special ID
-            router.push("/triage?id=latest")
-
-        } catch (error) {
-            console.error(error)
-            alert("Failed to process triage request. Please try again.")
+            // Navigate to triage page
+            router.push("/triage?source=intake")
+        } catch (err: any) {
+            alert(`Error: ${err.message || "Failed to run triage analysis. Is the backend running?"}`)
         } finally {
             setIsSubmitting(false)
         }
@@ -679,29 +706,39 @@ export default function PatientIntakePage() {
                                     isDragging
                                         ? "border-primary bg-primary/5"
                                         : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/50",
-                                    uploadedFile && "border-green-500 bg-green-500/5"
+                                    uploadedFile && !ehrError && "border-green-500 bg-green-500/5",
+                                    ehrError && "border-red-500 bg-red-500/5"
                                 )}
                             >
                                 <input
                                     type="file"
-                                    accept=".pdf"
+                                    accept=".docx,.doc"
                                     onChange={handleFileSelect}
                                     className="hidden"
                                     id="file-upload"
                                 />
-                                {uploadedFile ? (
+                                {ehrParsing ? (
+                                    <div className="flex flex-col items-center gap-3">
+                                        <Loader2 className="w-12 h-12 animate-spin text-primary" />
+                                        <p className="text-lg font-medium">Parsing EHR document...</p>
+                                        <p className="text-sm text-muted-foreground">Extracting patient data</p>
+                                    </div>
+                                ) : uploadedFile ? (
                                     <div className="flex items-center justify-center gap-4">
-                                        <FileText className="w-12 h-12 text-green-500" />
+                                        <FileText className={cn("w-12 h-12", ehrError ? "text-red-500" : "text-green-500")} />
                                         <div className="text-left">
-                                            <p className="font-medium text-green-600">{uploadedFile.name}</p>
+                                            <p className={cn("font-medium", ehrError ? "text-red-600" : "text-green-600")}>{uploadedFile.name}</p>
                                             <p className="text-sm text-muted-foreground">
                                                 {(uploadedFile.size / 1024).toFixed(1)} KB
                                             </p>
+                                            {ehrError && (
+                                                <p className="text-sm text-red-500 mt-1">{ehrError}</p>
+                                            )}
                                         </div>
                                         <Button
                                             variant="ghost"
                                             size="icon"
-                                            onClick={removeFile}
+                                            onClick={() => { removeFile(); setEhrParsedData(null); setEhrError(null) }}
                                             className="ml-4"
                                         >
                                             <X className="w-4 h-4" />
@@ -719,58 +756,157 @@ export default function PatientIntakePage() {
                                 }
                             </div >
 
-                            {/* Manual Entry Prompt */}
-                            < div className="text-center" >
-                                <p className="text-sm text-muted-foreground mb-4">
-                                    {t("intake_complement_doc")}
-                                </p>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-xl mx-auto">
-                                    <Input
-                                        placeholder="Patient Name"
-                                        value={formData.name}
-                                        onChange={(e) => updateField("name", e.target.value)}
-                                    />
-                                    <Input
-                                        type="number"
-                                        placeholder="Age"
-                                        value={formData.age}
-                                        onChange={(e) => updateField("age", e.target.value)}
-                                    />
-                                    <Select
-                                        value={formData.gender}
-                                        onValueChange={(value) => updateField("gender", value)}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Gender" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="male">Male</SelectItem>
-                                            <SelectItem value="female">Female</SelectItem>
-                                            <SelectItem value="other">Other</SelectItem>
-                                        </SelectContent>
-                                    </Select>
+                            {/* Parsed EHR Data Preview */}
+                            {ehrParsedData && (
+                                <Card className="bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800">
+                                    <CardHeader className="pb-3">
+                                        <CardTitle className="text-sm flex items-center gap-2">
+                                            <CheckCircle2 className="w-4 h-4 text-green-600" />
+                                            Extracted Patient Data
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-3 text-sm">
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                            {ehrParsedData.age > 0 && (
+                                                <div><span className="text-muted-foreground">Age:</span> <strong>{ehrParsedData.age}</strong></div>
+                                            )}
+                                            {ehrParsedData.gender && (
+                                                <div><span className="text-muted-foreground">Gender:</span> <strong className="capitalize">{ehrParsedData.gender}</strong></div>
+                                            )}
+                                            {ehrParsedData.heart_rate && (
+                                                <div><span className="text-muted-foreground">HR:</span> <strong>{ehrParsedData.heart_rate} bpm</strong></div>
+                                            )}
+                                            {ehrParsedData.blood_pressure_systolic && (
+                                                <div><span className="text-muted-foreground">BP:</span> <strong>{ehrParsedData.blood_pressure_systolic}/{ehrParsedData.blood_pressure_diastolic} mmHg</strong></div>
+                                            )}
+                                            {ehrParsedData.temperature && (
+                                                <div><span className="text-muted-foreground">Temp:</span> <strong>{ehrParsedData.temperature}°F</strong></div>
+                                            )}
+                                            {ehrParsedData.oxygen_saturation && (
+                                                <div><span className="text-muted-foreground">SpO2:</span> <strong>{ehrParsedData.oxygen_saturation}%</strong></div>
+                                            )}
+                                            {ehrParsedData.respiratory_rate && (
+                                                <div><span className="text-muted-foreground">RR:</span> <strong>{ehrParsedData.respiratory_rate}/min</strong></div>
+                                            )}
+                                        </div>
+                                        {ehrParsedData.symptoms?.length > 0 && (
+                                            <div>
+                                                <span className="text-muted-foreground">Symptoms:</span>{" "}
+                                                <div className="flex flex-wrap gap-1 mt-1">
+                                                    {ehrParsedData.symptoms.map((s: string) => (
+                                                        <Badge key={s} variant="secondary" className="text-xs">{s}</Badge>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                        {ehrParsedData.conditions?.length > 0 && (
+                                            <div>
+                                                <span className="text-muted-foreground">Conditions:</span>{" "}
+                                                <div className="flex flex-wrap gap-1 mt-1">
+                                                    {ehrParsedData.conditions.map((c: string) => (
+                                                        <Badge key={c} variant="outline" className="text-xs">{c}</Badge>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                        {ehrParsedData.notes && (
+                                            <div>
+                                                <span className="text-muted-foreground">Notes:</span>{" "}
+                                                <em>"{ehrParsedData.notes}"</em>
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            )}
+
+                            {/* Override fields (shown when EHR is parsed) */}
+                            {ehrParsedData && (
+                                <div className="text-center">
+                                    <p className="text-sm text-muted-foreground mb-4">
+                                        You can override extracted values below
+                                    </p>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-xl mx-auto">
+                                        <Input
+                                            placeholder="Patient Name"
+                                            value={formData.name}
+                                            onChange={(e) => updateField("name", e.target.value)}
+                                        />
+                                        <Input
+                                            type="number"
+                                            placeholder="Age"
+                                            value={formData.age}
+                                            onChange={(e) => updateField("age", e.target.value)}
+                                        />
+                                        <Select
+                                            value={formData.gender}
+                                            onValueChange={(value) => updateField("gender", value)}
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Gender" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="male">Male</SelectItem>
+                                                <SelectItem value="female">Female</SelectItem>
+                                                <SelectItem value="other">Other</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
                                 </div>
-                            </div >
+                            )}
+
+                            {/* Manual Entry Prompt (fallback when no EHR is parsed) */}
+                            {!ehrParsedData && (
+                                <div className="text-center">
+                                    <p className="text-sm text-muted-foreground mb-4">
+                                        {t("intake_complement_doc")}
+                                    </p>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-xl mx-auto">
+                                        <Input
+                                            placeholder="Patient Name"
+                                            value={formData.name}
+                                            onChange={(e) => updateField("name", e.target.value)}
+                                        />
+                                        <Input
+                                            type="number"
+                                            placeholder="Age"
+                                            value={formData.age}
+                                            onChange={(e) => updateField("age", e.target.value)}
+                                        />
+                                        <Select
+                                            value={formData.gender}
+                                            onValueChange={(value) => updateField("gender", value)}
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Gender" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="male">Male</SelectItem>
+                                                <SelectItem value="female">Female</SelectItem>
+                                                <SelectItem value="other">Other</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Submit Button */}
-                            < Button
+                            <Button
                                 size="lg"
                                 className="w-full"
-                                disabled={!uploadedFile || isSubmitting}
+                                disabled={!ehrParsedData || !formData.name || !formData.age || isSubmitting}
                                 onClick={handleSubmit}
                             >
-                                {
-                                    isSubmitting ? (
-                                        <>
-                                            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                                            {t("intake_processing")}
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Sparkles className="w-5 h-5 mr-2" />
-                                            Run AI Triage Analysis
-                                        </>
-                                    )}
+                                {isSubmitting ? (
+                                    <>
+                                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                                        {t("intake_processing")}
+                                    </>
+                                ) : (
+                                    <>
+                                        <Sparkles className="w-5 h-5 mr-2" />
+                                        Run AI Triage Analysis
+                                    </>
+                                )}
                             </Button >
                         </CardContent >
                     </Card >

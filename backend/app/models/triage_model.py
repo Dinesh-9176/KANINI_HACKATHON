@@ -31,23 +31,25 @@ def predict_triage(features: np.ndarray) -> dict:
     probabilities = model.predict_proba(features)[0]
     confidence = int(round(float(np.max(probabilities)) * 100))
 
-    # Map triage level to risk level and priority score range
+    # Map triage level to risk level and base priority score range
     if triage_level == 0:
         risk_level = "low"
-        priority_score = int(np.random.randint(10, 36))
+        base_min, base_max = 10, 35
     elif triage_level == 1:
         risk_level = "medium"
-        priority_score = int(np.random.randint(36, 66))
+        base_min, base_max = 36, 65
     elif triage_level == 2:
         risk_level = "high"
-        priority_score = int(np.random.randint(66, 90))
+        base_min, base_max = 66, 89
     else:  # 3 = critical
         risk_level = "high"
-        priority_score = int(np.random.randint(90, 101))
+        base_min, base_max = 90, 100
 
-    # Refine priority score using weighted probability
-    weighted_score = sum(prob * level * 25 for level, prob in enumerate(probabilities))
-    priority_score = int(min(max(weighted_score + 10, 5), 100))
+    # Use model confidence to place score within the range for this triage level
+    # Higher confidence → higher end of the range
+    range_position = float(np.max(probabilities))
+    priority_score = int(base_min + (base_max - base_min) * range_position)
+    priority_score = int(min(max(priority_score, base_min), base_max))
 
     return {
         "risk_level": risk_level,

@@ -1,0 +1,279 @@
+
+╭─── Claude Code v2.1.42 ──────────────────────────────────────────────────────╮
+│                                         │ Tips for getting started           │
+│             Welcome back dk!            │ Run /init to create a CLAUDE.md f… │
+│                                         │ ────────────────────────────────── │
+│                 ▐▛███▜▌                 │ Recent activity                    │
+│                ▝▜█████▛▘                │ No recent activity                 │
+│                  ▘▘ ▝▝                  │                                    │
+│                                         │                                    │
+│          Opus 4.6 · Claude Pro          │                                    │
+│   ~\OneDrive\Desktop\kanini_hackathon   │                                    │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+✻ Conversation compacted (ctrl+o for history)
+
+  ⎿  Read frontend\src\components\triage\DepartmentRecommendations.tsx (334 
+     lines)
+  ⎿  Read frontend\src\components\layout\Sidebar.tsx (113 lines)
+  ⎿  Read frontend\src\app\patients\page.tsx (301 lines)
+  ⎿  Read frontend\src\app\page.tsx (167 lines)
+  ⎿  Referenced file frontend\src\app\intake\page.tsx
+  ⎿  Plan file referenced (~\.claude\plans\binary-prancing-valley.md)
+
+● I need to write the plan file for the 4 new features and call ExitPlanMode for
+   user approval.
+
+● Updated plan
+  ⎿  Error writing file
+
+● Let me read the existing plan file first, then update it.
+
+● Read 1 file (ctrl+o to expand)
+
+● Now I'll replace the entire plan with the new features plan.
+
+● Updated plan
+  ⎿  /plan to preview
+
+● The plan is complete. Let me submit it for your approval.
+
+● User approved Claude's plan
+  ⎿  Plan saved to: ~\.claude\plans\binary-prancing-valley.md · /plan to 
+     edit
+     New Features Implementation Plan
+
+     Context
+
+     The hospital triage app now has a working Supabase-backed pipeline
+     (intake → AI triage → DB persistence → dashboard/patients views). The
+     user wants 4 new features: voice input with multilingual support,
+     simulated wearable device integration, AI length-of-stay prediction,
+     and lab/room booking with full DB integration.
+
+     ---
+     Feature 1: Voice Input (3rd Intake Tab)
+
+     What: Patient speaks symptoms/complaint → browser transcribes → backend
+      extracts structured data → feeds to existing triage AI.
+
+     Frontend Changes
+
+     frontend/src/app/intake/page.tsx — Add 3rd tab "Voice Input"
+     - Language selector dropdown: English (en-US), Tamil (ta-IN), Hindi
+     (hi-IN), Spanish (es-ES), Telugu (te-IN)
+     - Large microphone button with recording animation (pulse effect)
+     - Live transcript textarea showing recognized text in real-time
+     - Uses Web Speech API (window.SpeechRecognition /
+     webkitSpeechRecognition)
+     - "Extract & Review" button → calls POST /api/parse-voice → shows
+     parsed data preview (same pattern as EHR tab)
+     - "Submit to Triage" button → sends extracted data to /api/triage
+
+     Backend Changes
+
+     backend/app/routes/voice.py (NEW)
+     - POST /api/parse-voice — accepts { transcript: string, language: 
+     string }
+     - Keyword extraction: scans transcript for known symptom keywords
+     (fever, chest pain, headache, nausea, etc.) and condition keywords
+     (diabetes, hypertension, asthma, etc.)
+     - Returns structured data: { symptoms: [], conditions: [], notes:
+     string } matching existing intake format
+     - Symptom keyword lists for each supported language
+
+     backend/app/main.py — Register voice_router
+
+     ---
+     Feature 2: Wearable Device Simulation (4th Intake Tab)
+
+     What: Simulated Bluetooth device connection that generates realistic 
+     vitals. Frontend-only (no backend changes).
+
+     Frontend Changes
+
+     frontend/src/components/intake/WearableSimulator.tsx (NEW)
+     - Simulated devices: "FitBand Pro", "HealthWatch X1", "MedSensor Patch"
+     - Connection flow states: Idle → Scanning (2s animation) → Device List
+     → Connecting (1.5s) → Connected → Streaming
+     - Once connected, generates vitals with realistic ranges + slight
+     random fluctuation every second:
+       - HR: 60-100 bpm, BP: 110-140/70-90, SpO2: 94-100%, Temp:
+     97.5-99.5°F, RR: 12-20
+     - "Use These Vitals" button → calls parent callback to auto-fill intake
+      form
+
+     frontend/src/app/intake/page.tsx — Add 4th tab "Smart Device"
+     - Renders <WearableSimulator onVitalsReady={callback} />
+     - On vitals accepted, auto-fills the vitals fields and enables 
+     symptom/condition entry
+     - Submit flows to /api/triage as usual
+
+     ---
+     Feature 3: AI Length of Stay (LOS) Prediction
+
+     What: After triage, predict how long the patient will stay. Rule-based 
+     model using risk level, disease, age, and vitals.
+
+     Backend Changes
+
+     backend/app/models/los_model.py (NEW)
+     - predict_los(risk_level, predicted_disease, age, vitals) → { days: 
+     int, confidence: float }
+     - Rules:
+       - Base days by risk: high=7, medium=3, low=1
+       - Disease modifiers: cardiac/neuro +3, respiratory +2, infectious +1,
+      dermatology/ent -1
+       - Age modifier: +1 day per decade over 60
+       - Vital severity: abnormal HR/BP/SpO2 add 0.5-2 days each
+       - Confidence: inverse of variance (higher risk = lower confidence)
+
+     backend/app/routes/triage.py — Call predict_los() after triage, include
+      in response, persist estimated_los_days and los_confidence to 
+     triage_results table
+
+     backend/app/schemas/patient.py — Add estimated_los_days: int and
+     los_confidence: float to TriageResponse
+
+     Frontend Changes
+
+     frontend/src/lib/api.ts — Add LOS fields to TriageResult type
+
+     frontend/src/components/triage/PatientDetails.tsx — New "Length of 
+     Stay" card in the triage results view showing estimated days with a 
+     confidence indicator
+
+     frontend/src/app/triage/page.tsx — Pass LOS data from triage result to
+     PatientDetails
+
+     ---
+     Feature 4: Lab Availability & Room/Bed Booking
+
+     What: After triage, doctors can book lab tests and assign rooms/beds.
+     Full Supabase DB integration.
+
+     Database (Supabase SQL)
+
+     Create 4 new tables via Supabase SQL editor:
+     - labs (id, name, type, is_available, estimated_time_mins, location)
+     - lab_bookings (id, patient_id→patients, lab_id→labs, test_name,
+     status, booked_at, completed_at)
+     - rooms (id, room_number, room_type, department_id→departments,
+     total_beds, available_beds, floor)
+     - bed_assignments (id, room_id→rooms, patient_id→patients, assigned_at,
+      discharged_at, status)
+
+     Seed data: 8 labs (Blood Lab, X-Ray, MRI, CT Scan, Ultrasound, ECG,
+     Pathology, Microbiology) + 15 rooms across departments.
+
+     Backend Changes
+
+     backend/app/routes/booking.py (NEW)
+     - GET /api/labs — list labs with availability
+     - POST /api/lab-bookings — book a lab test { patient_code, lab_id,
+     test_name }
+     - GET /api/lab-bookings/{patient_code} — patient's lab bookings
+     - GET /api/rooms — list rooms with availability (filterable by 
+     dept/type)
+     - POST /api/bed-assignments — assign bed { patient_code, room_id }
+     - GET /api/bed-assignments/{patient_code} — patient's bed assignment
+
+     backend/app/main.py — Register booking_router
+
+     Frontend Changes
+
+     frontend/src/lib/api.ts — Add fetch functions: fetchLabs(), 
+     bookLabTest(), fetchLabBookings(), fetchRooms(), assignBed(),
+     fetchBedAssignment()
+
+     frontend/src/components/triage/LabBooking.tsx (NEW)
+     - Grid of available labs with type badges, estimated wait times
+     - Click lab → select test → confirm booking → POST to backend
+     - Shows patient's booked tests as status cards
+
+     frontend/src/components/triage/RoomAllocation.tsx (NEW)
+     - Filter by department, room type (ICU/General/Private)
+     - Visual cards showing rooms with bed count (available/total)
+     - Click available room → assign to patient → updates availability
+     - Shows current assignment if patient already has a bed
+
+     frontend/src/components/triage/PatientDetails.tsx — Add "Lab Tests" and
+      "Room Assignment" sections using the new components
+
+     frontend/src/app/patients/page.tsx — Show lab bookings and bed info in
+     patient detail view
+
+     ---
+     Implementation Order
+
+     1. Feature 3 (LOS) — smallest, extends existing triage pipeline
+     2. Feature 4 (Lab & Room) — new DB tables + endpoints + UI
+     3. Features 1 & 2 (Voice + Wearable) — new intake tabs, can be done
+     together
+
+     Files Summary
+
+
+
+
+
+
+     File: backend/app/models/los_model.py
+     Action: NEW — LOS prediction
+     ────────────────────────────────────────
+     File: backend/app/routes/voice.py
+     Action: NEW — Voice transcript parser
+     ────────────────────────────────────────
+     File: backend/app/routes/booking.py
+     Action: NEW — Lab & room booking endpoints
+     ────────────────────────────────────────
+     File: backend/app/routes/triage.py
+     Action: MODIFY — Add LOS call + persist
+     ────────────────────────────────────────
+     File: backend/app/schemas/patient.py
+     Action: MODIFY — Add LOS fields
+     ────────────────────────────────────────
+     File: backend/app/main.py
+     Action: MODIFY — Register 2 new routers
+     ────────────────────────────────────────
+     File: frontend/src/components/intake/WearableSimulator.tsx
+     Action: NEW — Simulated device UI
+     ────────────────────────────────────────
+     File: frontend/src/components/triage/LabBooking.tsx
+     Action: NEW — Lab booking UI
+     ────────────────────────────────────────
+     File: frontend/src/components/triage/RoomAllocation.tsx
+     Action: NEW — Room/bed UI
+     ────────────────────────────────────────
+     File: frontend/src/lib/api.ts
+     Action: MODIFY — Add new fetch functions
+     ────────────────────────────────────────
+     File: frontend/src/app/intake/page.tsx
+     Action: MODIFY — Add voice + wearable tabs
+     ────────────────────────────────────────
+     File: frontend/src/app/triage/page.tsx
+     Action: MODIFY — Pass LOS data
+     ────────────────────────────────────────
+     File: frontend/src/components/triage/PatientDetails.tsx
+     Action: MODIFY — LOS card + lab/room sections
+     ────────────────────────────────────────
+     File: frontend/src/app/patients/page.tsx
+     Action: MODIFY — Show lab/room in detail view
+
+     Verification
+
+     1. Submit triage → verify LOS prediction appears on results page and in
+      Supabase triage_results
+     2. On triage results page, book a lab test → verify in lab_bookings 
+     table and UI
+     3. Assign a bed → verify bed_assignments table and room availability
+     updates
+     4. Voice tab → speak symptoms in selected language → verify transcript
+     → extract → triage works
+     5. Wearable tab → scan → connect → see streaming vitals → accept →
+     submit triage
+
+  ⎿  You've hit your limit · resets 2:30pm (Asia/Calcutta)
+     /upgrade or /extra-usage to finish what you’re working on.
+
+✻ Baked for 7m 45s

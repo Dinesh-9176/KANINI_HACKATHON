@@ -3,7 +3,7 @@
 import * as React from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Search } from "lucide-react"
+import { Search, Loader2 } from "lucide-react"
 import {
     Table,
     TableBody,
@@ -26,13 +26,27 @@ import {
     DialogClose,
 } from "@/components/ui/dialog"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-
-// Triage Components
 import { PatientDetails } from "@/components/triage/PatientDetails"
 import { SimpleTooltip } from "@/components/ui/simple-tooltip"
 import { getContributingFactors } from "@/lib/triageUtils"
+import { fetchPatients, fetchPatient, type QueuePatient, type PatientDetail } from "@/lib/api"
+import type { Patient } from "@/lib/mockData"
 
-import { mockPatients, type Patient } from "@/lib/mockData"
+function queueToPatient(q: QueuePatient): Patient {
+    return {
+        id: q.patient_code,
+        name: q.name,
+        age: q.age,
+        gender: q.gender,
+        riskLevel: q.risk_level as "high" | "medium" | "low",
+        priorityScore: q.priority_score,
+        waitingTime: q.waiting_time,
+        department: q.department_name || "General Medicine",
+        confidence: q.confidence,
+        symptoms: [],
+        vitals: { hr: 75, bp: "120/80", spo2: 98, temp: 98.6 },
+    }
+}
 
 // Status type for patient tracking
 interface PatientStatus {
@@ -50,12 +64,17 @@ function getPatientStatuses(): Record<string, PatientStatus> {
     }
 }
 
-export default function PatientsPage() {
+function PatientsContent() {
     const searchParams = useSearchParams()
     const router = useRouter()
     const id = searchParams.get("id")
 
-    // State for filters
+    const [patients, setPatients] = React.useState<QueuePatient[]>([])
+    const [loading, setLoading] = React.useState(true)
+    const [selectedDetail, setSelectedDetail] = React.useState<PatientDetail | null>(null)
+    const [detailLoading, setDetailLoading] = React.useState(false)
+
+    // Filters
     const [searchTerm, setSearchTerm] = React.useState("")
     const [sortBy, setSortBy] = React.useState("priority")
     const [deptFilter, setDeptFilter] = React.useState("all")
@@ -77,52 +96,52 @@ export default function PatientsPage() {
         return () => clearInterval(interval)
     }, [])
 
-    // Build the combined patient list (mock + latest from intake)
-    const allPatients = React.useMemo(() => {
-        const list = [...mockPatients]
-        try {
-            const saved = localStorage.getItem('latestPatient')
-            if (saved) {
-                const latest = JSON.parse(saved) as Patient
-                // Only add if not already in mock data
-                if (!list.find(p => p.id === latest.id)) {
-                    list.unshift(latest) // Add to top
-                }
-            }
-        } catch { /* ignore */ }
-        return list
+    // Fetch patients list
+    React.useEffect(() => {
+        fetchPatients()
+            .then(setPatients)
+            .catch((e) => console.error("Failed to fetch patients:", e))
+            .finally(() => setLoading(false))
     }, [])
 
-    // Derived Logic
-    const filteredAndSortedPatients = React.useMemo(() => {
-        let result = allPatients.filter(p => !removedIds.has(p.id))
+    // Fetch selected patient detail
+    React.useEffect(() => {
+        if (!id) {
+            setSelectedDetail(null)
+            return
+        }
+        setDetailLoading(true)
+        fetchPatient(id)
+            .then(setSelectedDetail)
+            .catch((e) => console.error("Failed to fetch patient:", e))
+            .finally(() => setDetailLoading(false))
+    }, [id])
 
-        // 1. Search (Name or ID)
+    const filteredAndSortedPatients = React.useMemo(() => {
+        let result = [...patients].filter(p => !removedIds.has(p.patient_code))
+
         if (searchTerm) {
             const lower = searchTerm.toLowerCase()
             result = result.filter(p =>
                 p.name.toLowerCase().includes(lower) ||
-                p.id.toLowerCase().includes(lower)
+                p.patient_code.toLowerCase().includes(lower)
             )
         }
 
-        // 2. Department Filter
         if (deptFilter !== "all") {
-            result = result.filter(p => p.department === deptFilter)
+            result = result.filter(p => p.department_name === deptFilter)
         }
 
-        // 3. Risk Filter
         if (riskFilter !== "all") {
-            result = result.filter(p => p.riskLevel === riskFilter)
+            result = result.filter(p => p.risk_level === riskFilter)
         }
 
-        // 4. Sorting
         result.sort((a, b) => {
             switch (sortBy) {
                 case "priority":
-                    return (b.priorityScore || 0) - (a.priorityScore || 0)
+                    return (b.priority_score || 0) - (a.priority_score || 0)
                 case "waiting":
-                    return b.waitingTime - a.waitingTime
+                    return b.waiting_time - a.waiting_time
                 case "name":
                     return a.name.localeCompare(b.name)
                 default:
@@ -131,7 +150,7 @@ export default function PatientsPage() {
         })
 
         return result
-    }, [allPatients, removedIds, searchTerm, deptFilter, riskFilter, sortBy])
+    }, [patients, removedIds, searchTerm, deptFilter, riskFilter, sortBy])
 
     const handleRemovePatient = (patientId: string) => {
         setRemovedIds(prev => new Set(prev).add(patientId))
@@ -140,20 +159,13 @@ export default function PatientsPage() {
 
     const handleViewPatient = (e: React.MouseEvent, patientId: string) => {
         e.stopPropagation()
-        router.push(`/triage?id=${patientId}`)
+        router.push(`/patients?id=${patientId}`)
     }
 
-    // Find selected patient if ID is present
-    const selectedPatient = React.useMemo(() => {
-        if (!id) return undefined
-        return allPatients.find((p) => p.id === id)
-    }, [id, allPatients])
-
-    // Get unique departments for filter dropdown
     const uniqueDepartments = React.useMemo(() => {
-        const depts = new Set(allPatients.map(p => p.department))
+        const depts = new Set(patients.map(p => p.department_name).filter(Boolean))
         return Array.from(depts)
-    }, [allPatients])
+    }, [patients])
 
     // Get status badge for a patient
     const getStatusBadge = (patientId: string) => {
@@ -182,10 +194,40 @@ export default function PatientsPage() {
     }
 
     // Patient removed name for dialog
-    const patientToRemove = removeDialogId ? allPatients.find(p => p.id === removeDialogId) : null
+    const patientToRemove = removeDialogId ? patients.find(p => p.patient_code === removeDialogId) : null
 
-    // --- VIEW: Patient Details (Triage) ---
-    if (selectedPatient) {
+    // --- Patient Detail View ---
+    if (id && selectedDetail) {
+        const intake = selectedDetail.intake
+        const triage = selectedDetail.triage
+        const p = selectedDetail.patient
+
+        const patient: Patient = {
+            id: p.patient_code,
+            name: p.name,
+            age: p.age,
+            gender: p.gender,
+            riskLevel: (triage?.risk_level || "low") as "high" | "medium" | "low",
+            priorityScore: triage?.priority_score || 0,
+            waitingTime: triage?.waiting_time || 0,
+            department: selectedDetail.department_name,
+            confidence: triage?.confidence || 0,
+            symptoms: intake?.symptoms || [],
+            vitals: {
+                hr: intake?.heart_rate || 75,
+                bp: `${intake?.blood_pressure_systolic || 120}/${intake?.blood_pressure_diastolic || 80}`,
+                spo2: intake?.oxygen_saturation || 98,
+                temp: intake?.temperature || 98.6,
+            },
+        }
+
+        const factors = selectedDetail.contributing_factors.map(f => ({
+            name: f.name,
+            value: f.value,
+            impact: f.impact,
+            isPositive: f.is_positive,
+        }))
+
         return (
             <div className="h-full flex flex-col">
                 <div className="flex items-center gap-4 mb-4">
@@ -194,15 +236,26 @@ export default function PatientsPage() {
                     </Button>
                     <h2 className="text-xl font-semibold">Patient Triage View</h2>
                 </div>
-
                 <div className="flex-1 overflow-hidden rounded-xl border bg-background shadow-sm">
-                    <PatientDetails patient={selectedPatient} />
+                    <PatientDetails
+                        patient={patient}
+                        contributingFactors={factors.length > 0 ? factors : undefined}
+                        predictedDisease={triage?.predicted_disease}
+                    />
                 </div>
             </div>
         )
     }
 
-    // --- VIEW: Patient Directory ---
+    if (id && detailLoading) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+        )
+    }
+
+    // --- Patient Directory View ---
     return (
         <div className="space-y-6 h-full p-2">
             <div className="flex justify-between items-center">
@@ -212,7 +265,6 @@ export default function PatientsPage() {
 
             <div className="clay-card p-6 overflow-hidden">
                 <div className="flex flex-col xl:flex-row gap-4 mb-6">
-                    {/* Search */}
                     <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-cyan-700/50" />
                         <Input
@@ -223,9 +275,7 @@ export default function PatientsPage() {
                         />
                     </div>
 
-                    {/* Filters */}
                     <div className="flex flex-wrap gap-3">
-                        {/* Department Filter */}
                         <Select value={deptFilter} onValueChange={setDeptFilter}>
                             <SelectTrigger className="w-[200px] h-12 rounded-xl border-slate-200 clay-button bg-white text-slate-600 font-medium">
                                 <SelectValue placeholder="Department" />
@@ -238,7 +288,6 @@ export default function PatientsPage() {
                             </SelectContent>
                         </Select>
 
-                        {/* Risk Filter */}
                         <Select value={riskFilter} onValueChange={setRiskFilter}>
                             <SelectTrigger className="w-[160px] h-12 rounded-xl border-slate-200 clay-button bg-white text-slate-600 font-medium">
                                 <SelectValue placeholder="Risk Level" />
@@ -246,12 +295,11 @@ export default function PatientsPage() {
                             <SelectContent className="rounded-xl border-slate-100 shadow-xl bg-white dark:bg-slate-800 z-50">
                                 <SelectItem value="all">All Risks</SelectItem>
                                 <SelectItem value="high">High Risk</SelectItem>
-                                <SelectItem value="moderate">Moderate Risk</SelectItem>
+                                <SelectItem value="medium">Medium Risk</SelectItem>
                                 <SelectItem value="low">Low Risk</SelectItem>
                             </SelectContent>
                         </Select>
 
-                        {/* Sort */}
                         <Select value={sortBy} onValueChange={setSortBy}>
                             <SelectTrigger className="w-[180px] h-12 rounded-xl border-slate-200 clay-button bg-white text-slate-600 font-medium">
                                 <SelectValue placeholder="Sort By" />
@@ -265,108 +313,111 @@ export default function PatientsPage() {
                     </div>
                 </div>
 
-                <div className="rounded-xl overflow-hidden overflow-x-auto border border-slate-100">
-                    <Table>
-                        <TableHeader className="bg-cyan-50/50">
-                            <TableRow className="border-slate-100 hover:bg-transparent">
-                                <TableHead className="font-bold text-cyan-900 uppercase text-xs tracking-wider py-4">ID</TableHead>
-                                <TableHead className="font-bold text-cyan-900 uppercase text-xs tracking-wider">Name</TableHead>
-                                <TableHead className="font-bold text-cyan-900 uppercase text-xs tracking-wider">Age</TableHead>
-                                <TableHead className="font-bold text-cyan-900 uppercase text-xs tracking-wider">Department</TableHead>
-                                <TableHead className="font-bold text-cyan-900 uppercase text-xs tracking-wider">Risk Level</TableHead>
-                                <TableHead className="font-bold text-cyan-900 uppercase text-xs tracking-wider">Status</TableHead>
-                                <TableHead className="font-bold text-cyan-900 uppercase text-xs tracking-wider">Priority</TableHead>
-                                <TableHead className="font-bold text-cyan-900 uppercase text-xs tracking-wider">Wait Time</TableHead>
-                                <TableHead className="text-right font-bold text-cyan-900 uppercase text-xs tracking-wider">Actions</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {filteredAndSortedPatients.map((patient) => (
-                                <TableRow
-                                    key={patient.id}
-                                    className="border-slate-100 hover:bg-cyan-50/30 cursor-pointer transition-all duration-200"
-                                    onClick={() => router.push(`/triage?id=${patient.id}`)}
-                                >
-                                    <TableCell className="font-bold text-slate-600">#{patient.id}</TableCell>
-                                    <TableCell className="font-semibold text-slate-800">{patient.name}</TableCell>
-                                    <TableCell className="text-slate-600">{patient.age}</TableCell>
-                                    <TableCell className="text-slate-600">{patient.department}</TableCell>
-                                    <TableCell>
-                                        <Badge variant={patient.riskLevel === 'high' ? 'destructive' : 'secondary'} className={cn("rounded-full px-3 py-0.5 font-bold shadow-sm", patient.riskLevel === 'high' ? 'bg-rose-100 text-rose-700 hover:bg-rose-200' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
-                                            {patient.riskLevel.toUpperCase()}
-                                        </Badge>
-                                    </TableCell>
-                                    <TableCell>
-                                        {getStatusBadge(patient.id)}
-                                    </TableCell>
-                                    <TableCell className="font-mono font-bold text-cyan-700">
-                                        <SimpleTooltip className="cursor-help" content={
-                                            <div className="space-y-1 min-w-[200px]">
-                                                <div className="font-bold text-xs uppercase tracking-wider text-slate-400 border-b border-slate-700 pb-1 mb-2">
-                                                    Why this Priority?
-                                                </div>
-                                                {getContributingFactors(patient).slice(0, 3).map((f, i) => (
-                                                    <div key={i} className="flex justify-between items-center gap-4 text-xs">
-                                                        <span className="text-slate-300">{f.name}</span>
-                                                        <span className={cn("font-mono", f.isPositive ? "text-emerald-400" : "text-rose-400")}>{f.value}</span>
-                                                    </div>
-                                                ))}
-                                                <div className="pt-2 mt-1 border-t border-slate-800 text-[10px] text-slate-500 text-center">
-                                                    Click to view full analysis
-                                                </div>
-                                            </div>
-                                        }>
-                                            <span className="border-b border-dotted border-cyan-400/50 hover:border-cyan-600 transition-colors">
-                                                {patient.priorityScore}
-                                            </span>
-                                        </SimpleTooltip>
-                                    </TableCell>
-                                    <TableCell>
-                                        <span className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ring-1 ring-inset ring-cyan-600/10 text-cyan-700 bg-cyan-50">
-                                            {patient.waitingTime}m
-                                        </span>
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        <div className="flex justify-end gap-2">
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className="h-8 px-3 rounded-lg hover:bg-cyan-100 text-cyan-600 text-xs font-semibold"
-                                                onClick={(e) => handleViewPatient(e, patient.id)}
-                                            >
-                                                View
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className="h-8 px-3 rounded-lg hover:bg-rose-100 text-rose-500 text-xs font-semibold"
-                                                onClick={(e) => {
-                                                    e.stopPropagation()
-                                                    setRemoveDialogId(patient.id)
-                                                }}
-                                            >
-                                                Remove
-                                            </Button>
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </div>
-
-                {/* Empty State */}
-                {filteredAndSortedPatients.length === 0 && (
+                {loading ? (
+                    <div className="flex items-center justify-center h-40">
+                        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                    </div>
+                ) : filteredAndSortedPatients.length === 0 ? (
                     <div className="text-center py-12 text-slate-400">
                         <p className="text-lg font-semibold mb-1">No patients found</p>
                         <p className="text-sm">Try adjusting your search or filters.</p>
                     </div>
+                ) : (
+                    <div className="rounded-xl overflow-hidden overflow-x-auto border border-slate-100">
+                        <Table>
+                            <TableHeader className="bg-cyan-50/50">
+                                <TableRow className="border-slate-100 hover:bg-transparent">
+                                    <TableHead className="font-bold text-cyan-900 uppercase text-xs tracking-wider py-4">ID</TableHead>
+                                    <TableHead className="font-bold text-cyan-900 uppercase text-xs tracking-wider">Name</TableHead>
+                                    <TableHead className="font-bold text-cyan-900 uppercase text-xs tracking-wider">Age</TableHead>
+                                    <TableHead className="font-bold text-cyan-900 uppercase text-xs tracking-wider">Department</TableHead>
+                                    <TableHead className="font-bold text-cyan-900 uppercase text-xs tracking-wider">Risk Level</TableHead>
+                                    <TableHead className="font-bold text-cyan-900 uppercase text-xs tracking-wider">Status</TableHead>
+                                    <TableHead className="font-bold text-cyan-900 uppercase text-xs tracking-wider">Priority</TableHead>
+                                    <TableHead className="font-bold text-cyan-900 uppercase text-xs tracking-wider">Wait Time</TableHead>
+                                    <TableHead className="text-right font-bold text-cyan-900 uppercase text-xs tracking-wider">Actions</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {filteredAndSortedPatients.map((patient) => (
+                                    <TableRow
+                                        key={patient.patient_code}
+                                        className="border-slate-100 hover:bg-cyan-50/30 cursor-pointer transition-all duration-200"
+                                        onClick={() => router.push(`/patients?id=${patient.patient_code}`)}
+                                    >
+                                        <TableCell className="font-bold text-slate-600">#{patient.patient_code}</TableCell>
+                                        <TableCell className="font-semibold text-slate-800">{patient.name}</TableCell>
+                                        <TableCell className="text-slate-600">{patient.age}</TableCell>
+                                        <TableCell className="text-slate-600">{patient.department_name}</TableCell>
+                                        <TableCell>
+                                            <Badge variant={patient.risk_level === 'high' ? 'destructive' : 'secondary'} className={cn("rounded-full px-3 py-0.5 font-bold shadow-sm", patient.risk_level === 'high' ? 'bg-rose-100 text-rose-700 hover:bg-rose-200' : patient.risk_level === 'medium' ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200')}>
+                                                {patient.risk_level.toUpperCase()}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                            {getStatusBadge(patient.patient_code)}
+                                        </TableCell>
+                                        <TableCell className="font-mono font-bold text-cyan-700">
+                                            <SimpleTooltip className="cursor-help" content={
+                                                <div className="space-y-1 min-w-[200px]">
+                                                    <div className="font-bold text-xs uppercase tracking-wider text-slate-400 border-b border-slate-700 pb-1 mb-2">
+                                                        Why this Priority?
+                                                    </div>
+                                                    {getContributingFactors(queueToPatient(patient)).slice(0, 3).map((f, i) => (
+                                                        <div key={i} className="flex justify-between items-center gap-4 text-xs">
+                                                            <span className="text-slate-300">{f.name}</span>
+                                                            <span className={cn("font-mono", f.isPositive ? "text-emerald-400" : "text-rose-400")}>{f.value}</span>
+                                                        </div>
+                                                    ))}
+                                                    <div className="pt-2 mt-1 border-t border-slate-800 text-[10px] text-slate-500 text-center">
+                                                        Click to view full analysis
+                                                    </div>
+                                                </div>
+                                            }>
+                                                <span className="border-b border-dotted border-cyan-400/50 hover:border-cyan-600 transition-colors">
+                                                    {patient.priority_score}
+                                                </span>
+                                            </SimpleTooltip>
+                                        </TableCell>
+                                        <TableCell>
+                                            <span className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ring-1 ring-inset ring-cyan-600/10 text-cyan-700 bg-cyan-50">
+                                                {patient.waiting_time}m
+                                            </span>
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <div className="flex justify-end gap-2">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-8 px-3 rounded-lg hover:bg-cyan-100 text-cyan-600 text-xs font-semibold"
+                                                    onClick={(e) => handleViewPatient(e, patient.patient_code)}
+                                                >
+                                                    View
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-8 px-3 rounded-lg hover:bg-rose-100 text-rose-500 text-xs font-semibold"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation()
+                                                        setRemoveDialogId(patient.patient_code)
+                                                    }}
+                                                >
+                                                    Remove
+                                                </Button>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
                 )}
 
-                {/* Pagination Mockup */}
+                {/* Pagination Footer */}
                 <div className="flex items-center justify-between py-6">
                     <span className="text-sm text-slate-500 font-medium">
-                        Showing {filteredAndSortedPatients.length} of {allPatients.length - removedIds.size} patients
+                        Showing {filteredAndSortedPatients.length} of {patients.length - removedIds.size} patients
                     </span>
                     <div className="flex gap-2">
                         <Button variant="outline" size="sm" disabled className="rounded-xl border-slate-200 text-slate-400">Previous</Button>
@@ -399,5 +450,13 @@ export default function PatientsPage() {
                 </DialogContent>
             </Dialog>
         </div>
+    )
+}
+
+export default function PatientsPage() {
+    return (
+        <React.Suspense fallback={<div className="p-4">Loading patients...</div>}>
+            <PatientsContent />
+        </React.Suspense>
     )
 }

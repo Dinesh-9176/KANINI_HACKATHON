@@ -19,9 +19,19 @@ import { type Patient, type ContributingFactor } from "@/lib/mockData"
 import { cn } from "@/lib/utils"
 import { ECGMonitor } from "./ECGMonitor"
 import { ReportIssueDialog } from "./ReportIssueDialog"
+import { BedAllocation } from "./BedAllocation"
+import { LabBooking } from "./LabBooking"
+
+interface TopDisease {
+    disease: string
+    probability: number
+}
 
 interface PatientDetailsProps {
     patient: Patient | undefined
+    contributingFactors?: ContributingFactor[]
+    predictedDisease?: string
+    topDiseases?: TopDisease[]
 }
 
 function getRiskBadgeStyles(riskLevel: string) {
@@ -50,7 +60,7 @@ function getRiskBadgeStyles(riskLevel: string) {
     }
 }
 
-export function PatientDetails({ patient }: PatientDetailsProps) {
+export function PatientDetails({ patient, contributingFactors: apiFactors, predictedDisease, topDiseases }: PatientDetailsProps) {
     // Vitals state
     const [vitals, setVitals] = React.useState({
         hr: patient?.vitals?.hr || 98,
@@ -319,10 +329,10 @@ export function PatientDetails({ patient }: PatientDetailsProps) {
     }
 
     const riskStyles = getRiskBadgeStyles(patient.riskLevel)
-    // Use backend contributing factors if available, otherwise fall back to mock
-    const factors = patient.contributingFactors && patient.contributingFactors.length > 0
+    // Use API factors first, then backend contributing factors, then fall back to mock
+    const factors = apiFactors || (patient.contributingFactors && patient.contributingFactors.length > 0
         ? patient.contributingFactors
-        : getContributingFactors(patient)
+        : getContributingFactors(patient))
 
     // Ensure resources are allocated if not present
     if (!patient.allocatedRoom || !patient.requiredLabs) {
@@ -573,6 +583,83 @@ export function PatientDetails({ patient }: PatientDetailsProps) {
                                 </div>
                             </div>
                         ))}
+                    </div>
+                </div>
+
+                {/* Enhanced AI Diagnosis with Differential */}
+                <div className="clay-card p-6 relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 blur-3xl rounded-full group-hover:bg-cyan-500/20 transition-all duration-1000" />
+                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-[0.2em] mb-4">AI Diagnosis</h3>
+                    <div className="flex items-center justify-between relative z-10">
+                        <div>
+                            <div className="font-bold text-slate-800 dark:text-white text-xl tracking-tight">{patient.department}</div>
+                            {predictedDisease && (
+                                <div className="text-sm text-cyan-600 dark:text-cyan-400 font-medium mt-0.5 capitalize">{predictedDisease}</div>
+                            )}
+                            <div className="text-xs text-slate-500 mt-1">Based on {patient.symptoms?.length} key markers</div>
+                        </div>
+                        <div className="text-right">
+                            <div className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">~{patient.waitingTime + 5}m</div>
+                            <div className="text-[10px] text-slate-400 uppercase tracking-wider">Est. Wait</div>
+                        </div>
+                    </div>
+                    {topDiseases && topDiseases.length > 0 && (
+                        <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
+                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Differential Diagnosis</div>
+                            {topDiseases.map((d, i) => (
+                                <div key={i} className="flex items-center justify-between text-sm">
+                                    <span className="text-slate-600 dark:text-slate-300 capitalize">{d.disease}</span>
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-16 h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                                            <div
+                                                className={cn("h-full rounded-full", i === 0 ? "bg-cyan-500" : "bg-slate-400")}
+                                                style={{ width: `${d.probability}%` }}
+                                            />
+                                        </div>
+                                        <span className="text-xs text-slate-500 font-mono w-10 text-right">{d.probability}%</span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* Length of Stay Prediction */}
+                {patient.estimatedLosDays && (
+                    <div className="clay-card p-6 bg-gradient-to-br from-indigo-50 to-violet-50 dark:from-indigo-900/20 dark:to-violet-900/20 border-indigo-100 dark:border-indigo-800">
+                        <div className="flex justify-between items-start">
+                            <div>
+                                <h3 className="text-xs font-bold text-indigo-500 uppercase tracking-[0.2em] mb-2">Estimated Length of Stay</h3>
+                                <div className="flex items-baseline gap-2">
+                                    <span className="text-4xl font-black text-indigo-700 dark:text-indigo-300">
+                                        {patient.estimatedLosDays}
+                                    </span>
+                                    <span className="text-lg font-bold text-indigo-600/70 dark:text-indigo-400">Days</span>
+                                </div>
+                                <p className="text-xs text-indigo-400 mt-1 font-medium">
+                                    Based on risk factors & vitals
+                                </p>
+                            </div>
+                            {patient.losConfidence && (
+                                <div className="text-right">
+                                    <div className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-1">Confidence</div>
+                                    <Badge variant="outline" className="bg-white/50 dark:bg-black/20 border-indigo-200 dark:border-indigo-700 text-indigo-600 dark:text-indigo-300">
+                                        {Math.round(patient.losConfidence * 100)}%
+                                    </Badge>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* Bed Allocation & Lab Booking */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+                    <div className="clay-card p-6">
+                        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-[0.2em] mb-4">Bed Allocation - {patient.departmentName || "General"}</h3>
+                        <BedAllocation departmentId={patient.departmentId || "general"} patientId={patient.id} />
+                    </div>
+                    <div className="clay-card p-6">
+                        <LabBooking patientId={patient.id} />
                     </div>
                 </div>
 

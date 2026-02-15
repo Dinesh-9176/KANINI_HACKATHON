@@ -12,9 +12,9 @@ import {
     ChevronDown,
     ChevronRight,
 } from "lucide-react"
-import { mockPatients } from "@/lib/mockData"
 
-export function Sidebar() {
+// Internal component for the actual sidebar content using search params
+function SidebarContent() {
     const pathname = usePathname()
     const searchParams = useSearchParams()
     const { t } = useTranslation()
@@ -102,5 +102,13 @@ export function Sidebar() {
                 />
             )}
         </>
+    )
+}
+
+export function Sidebar() {
+    return (
+        <React.Suspense fallback={<div className="w-64 border-r bg-background h-screen hidden md:block" />}>
+            <SidebarContent />
+        </React.Suspense>
     )
 }
