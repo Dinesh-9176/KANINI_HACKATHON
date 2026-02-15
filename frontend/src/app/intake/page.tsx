@@ -33,6 +33,7 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
+import { useBluetoothDevice } from "@/hooks/useBluetoothDevice"
 
 // Common symptoms for multi-select
 const COMMON_SYMPTOMS = [
@@ -166,6 +167,20 @@ export default function PatientIntakePage() {
         setProgress(calculateProgress())
     }, [formData])
 
+    const {
+        connect: connectBluetooth,
+        isConnected: isBluetoothConnected,
+        isConnecting: isBluetoothConnecting,
+        error: bluetoothError,
+        deviceData
+    } = useBluetoothDevice()
+
+    React.useEffect(() => {
+        if (deviceData.heartRate) {
+            updateField("heartRate", deviceData.heartRate.toString())
+        }
+    }, [deviceData.heartRate])
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setIsSubmitting(true)
@@ -258,10 +273,10 @@ export default function PatientIntakePage() {
                     <h2 className="text-3xl font-bold tracking-tight">Patient Intake</h2>
                     <p className="text-muted-foreground">Enter patient information for AI-powered triage analysis</p>
                 </div>
-                <Badge variant="outline" className="px-4 py-2">
-                    <Sparkles className="w-4 h-4 mr-2 text-primary" />
-                    AI Assist Enabled
-                </Badge>
+                <div className="flex items-center px-4 py-2 bg-primary/10 border border-primary/20 rounded-full shadow-sm">
+                    <Sparkles className="w-4 h-4 mr-2 text-primary fill-primary/20" />
+                    <span className="text-sm font-semibold text-primary">AI Enabled Assist</span>
+                </div>
             </div>
 
             {/* Progress Bar */}
@@ -342,11 +357,33 @@ export default function PatientIntakePage() {
                         {/* Vitals */}
                         <Card className="mb-6">
                             <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
-                                    <Activity className="w-5 h-5 text-red-500" />
-                                    Vital Signs
-                                </CardTitle>
+                                <div className="flex justify-between items-center">
+                                    <CardTitle className="flex items-center gap-2">
+                                        <Activity className="w-5 h-5 text-red-500" />
+                                        Vital Signs
+                                    </CardTitle>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={connectBluetooth}
+                                        disabled={isBluetoothConnecting}
+                                        className={cn(isBluetoothConnected && "bg-green-100 text-green-700 border-green-200")}
+                                    >
+                                        {isBluetoothConnecting ? (
+                                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                        ) : isBluetoothConnected ? (
+                                            <CheckCircle2 className="w-4 h-4 mr-2" />
+                                        ) : (
+                                            <div className="mr-2">⚡</div>
+                                        )}
+                                        {isBluetoothConnected ? "Device Connected" : "Connect Wearable"}
+                                    </Button>
+                                </div>
                                 <CardDescription>Current physiological measurements</CardDescription>
+                                {bluetoothError && (
+                                    <p className="text-sm text-red-500 mt-2">{bluetoothError}</p>
+                                )}
                             </CardHeader>
                             <CardContent>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -577,7 +614,7 @@ export default function PatientIntakePage() {
                                 ) : (
                                     <label htmlFor="file-upload" className="cursor-pointer">
                                         <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                                        <p className="text-lg font-medium">Drop PDF here or click to browse</p>
+                                        <p className="text-lg font-medium">Upload EHR/EMR Document or click to browse</p>
                                         <p className="text-sm text-muted-foreground mt-2">
                                             Supports PDF files up to 10MB
                                         </p>

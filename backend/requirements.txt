@@ -7,4 +7,5 @@ numpy==1.26.0
 joblib==1.4.0
 pydantic==2.9.0
 python-multipart==0.0.9
-cors-middleware==0.0.1
+sqlalchemy==2.0.30
+

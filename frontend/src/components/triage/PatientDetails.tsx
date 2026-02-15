@@ -14,45 +14,16 @@ import {
     DialogFooter,
     DialogClose,
 } from "@/components/ui/dialog"
+import { getContributingFactors, allocateResources } from "@/lib/triageUtils"
 import { type Patient, type ContributingFactor } from "@/lib/mockData"
 import { cn } from "@/lib/utils"
 import { ECGMonitor } from "./ECGMonitor"
+import { ReportIssueDialog } from "./ReportIssueDialog"
 
 interface PatientDetailsProps {
     patient: Patient | undefined
 }
 
-// Mock contributing factors based on patient risk level
-const getContributingFactors = (patient: Patient): ContributingFactor[] => {
-    if (patient.riskLevel === "high") {
-        return [
-            { name: "Heart Rate", value: "130 bpm", impact: 92, isPositive: false },
-            { name: "Blood Pressure", value: "160/95 mmHg", impact: 85, isPositive: false },
-            { name: "Chest Pain", value: "Severe", impact: 78, isPositive: false },
-            { name: "Oxygen Saturation", value: "94%", impact: 65, isPositive: false },
-            { name: "Age Factor", value: "45 years", impact: 42, isPositive: true },
-        ]
-    } else if (patient.riskLevel === "medium") {
-        return [
-            { name: "Heart Rate", value: "95 bpm", impact: 55, isPositive: false },
-            { name: "Temperature", value: "99.5°F", impact: 48, isPositive: false },
-            { name: "Respiratory Rate", value: "20/min", impact: 35, isPositive: false },
-            { name: "Blood Pressure", value: "125/82 mmHg", impact: 25, isPositive: true },
-            { name: "SpO2", value: "97%", impact: 15, isPositive: true },
-        ]
-    } else {
-        return [
-            { name: "Blood Pressure", value: "118/75 mmHg", impact: 15, isPositive: true },
-            { name: "Heart Rate", value: "72 bpm", impact: 12, isPositive: true },
-            { name: "Temperature", value: "98.4°F", impact: 8, isPositive: true },
-            { name: "Oxygen Saturation", value: "99%", impact: 5, isPositive: true },
-        ]
-    }
-}
-
-// ... props ...
-
-// Risk badge styles corrected - no icon
 function getRiskBadgeStyles(riskLevel: string) {
     switch (riskLevel) {
         case "high":
@@ -353,314 +324,373 @@ export function PatientDetails({ patient }: PatientDetailsProps) {
         ? patient.contributingFactors
         : getContributingFactors(patient)
 
+    // Ensure resources are allocated if not present
+    if (!patient.allocatedRoom || !patient.requiredLabs) {
+        const allocation = allocateResources(patient)
+        patient.allocatedRoom = patient.allocatedRoom || allocation.room
+        patient.requiredLabs = patient.requiredLabs || allocation.labs
+    }
+
     return (
-        <div className="h-full overflow-y-auto p-4 md:p-6 space-y-6 md:space-y-8 custom-scrollbar">
-            {/* Header Section */}
-            <div className="clay-card p-6 flex flex-col md:flex-row gap-6 items-start justify-between">
-                <div className="space-y-2 w-full md:w-auto">
-                    <div className="flex items-center gap-3 flex-wrap">
-                        <h1 className="text-3xl font-bold tracking-tight text-slate-800 dark:text-white">{patient.name}</h1>
-                        <Badge variant="outline" className={cn("text-xs font-bold tracking-widest uppercase px-3 py-1 border-0 rounded-full", riskStyles.bg, riskStyles.text)}>
-                            {riskStyles.label}
-                        </Badge>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500 dark:text-slate-400 font-medium">
-                        <span className="font-mono text-xs bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded text-slate-600 dark:text-slate-300">#{patient.id}</span>
-                        <span className="hidden md:inline">•</span>
-                        <span>{patient.age} Years</span>
-                        <span className="hidden md:inline">•</span>
-                        <span>{patient.gender}</span>
-                        <span className="hidden md:inline">•</span>
-                        <span className="flex items-center gap-1 text-cyan-700 dark:text-cyan-400 font-semibold">
-                            {patient.waitingTime}m waiting
-                        </span>
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-6 w-full md:w-auto border-t md:border-0 border-slate-100 dark:border-slate-800 pt-4 md:pt-0">
-                    <div className="text-right">
-                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-1">AI Confidence</div>
-                        <div className="text-4xl font-black text-cyan-900 dark:text-white flex items-center justify-end gap-1">
-                            {patient.confidence}%
+        <div className="h-full overflow-y-auto custom-scrollbar relative">
+            <div className="p-4 md:p-6 space-y-6 md:space-y-8">
+                {/* Header Section */}
+                <div className="sticky top-0 z-20 clay-card p-6 flex flex-col md:flex-row gap-6 items-start justify-between bg-white/90 dark:bg-slate-900/90 backdrop-blur-md mb-6 shadow-md">
+                    <div className="space-y-2 w-full md:w-auto">
+                        <div className="flex items-center gap-3 flex-wrap">
+                            <h1 className="text-3xl font-bold tracking-tight text-slate-800 dark:text-white">{patient.name}</h1>
+                            <Badge variant="outline" className={cn("text-xs font-bold tracking-widest uppercase px-3 py-1 border-0 rounded-full", riskStyles.bg, riskStyles.text)}>
+                                {riskStyles.label}
+                            </Badge>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500 dark:text-slate-400 font-medium">
+                            <span className="font-mono text-xs bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded text-slate-600 dark:text-slate-300">#{patient.id}</span>
+                            <span className="hidden md:inline">•</span>
+                            <span>{patient.age} Years</span>
+                            <span className="hidden md:inline">•</span>
+                            <span>{patient.gender}</span>
+                            <span className="hidden md:inline">•</span>
+                            <span className="flex items-center gap-1 text-cyan-700 dark:text-cyan-400 font-semibold">
+                                {patient.waitingTime}m waiting
+                            </span>
                         </div>
                     </div>
 
-                    <div className="h-12 w-[1px] bg-slate-200 dark:bg-slate-700 hidden md:block" />
-
-                    <div className="flex-1 md:flex-none">
-                        <div className="flex justify-between items-center text-sm mb-1">
-                            <span className="font-medium text-slate-500">Priority</span>
-                            <span className="font-mono font-bold text-slate-800 dark:text-white">{patient.priorityScore}</span>
+                    <div className="flex items-center gap-6 w-full md:w-auto border-t md:border-0 border-slate-100 dark:border-slate-800 pt-4 md:pt-0">
+                        <div className="text-right">
+                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-1">AI Confidence</div>
+                            <div className="text-4xl font-black text-cyan-900 dark:text-white flex items-center justify-end gap-1">
+                                {patient.confidence}%
+                            </div>
                         </div>
-                        <div className="h-3 w-32 clay-inset overflow-hidden">
-                            <div
-                                className={cn("h-full rounded-full transition-all duration-1000",
-                                    patient.priorityScore >= 70 ? "bg-red-500" :
-                                        patient.priorityScore >= 40 ? "bg-amber-500" : "bg-emerald-500"
-                                )}
-                                style={{ width: `${patient.priorityScore}%` }}
+
+                        <div className="h-12 w-[1px] bg-slate-200 dark:bg-slate-700 hidden md:block" />
+
+                        <div className="flex-1 md:flex-none">
+                            <div className="flex justify-between items-center text-sm mb-1">
+                                <span className="font-medium text-slate-500">Priority</span>
+                                <span className="font-mono font-bold text-slate-800 dark:text-white">{patient.priorityScore}</span>
+                            </div>
+                            <div className="h-3 w-32 clay-inset overflow-hidden">
+                                <div
+                                    className={cn("h-full rounded-full transition-all duration-1000",
+                                        patient.priorityScore >= 70 ? "bg-red-500" :
+                                            patient.priorityScore >= 40 ? "bg-amber-500" : "bg-emerald-500"
+                                    )}
+                                    style={{ width: `${patient.priorityScore}%` }}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="h-12 w-[1px] bg-slate-200 dark:bg-slate-700 hidden md:block" />
+
+                        <div className="flex items-center gap-2">
+                            <ReportIssueDialog
+                                patientId={patient.id}
+                                patientName={patient.name}
+                                currentPriority={patient.priorityScore}
                             />
+                            <Button
+                                onClick={handlePrint}
+                                variant="outline"
+                                className="h-10 px-4 rounded-xl border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-cyan-50 hover:text-cyan-700 hover:border-cyan-200 transition-all gap-2"
+                            >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                                </svg>
+                                <span className="hidden lg:inline font-semibold text-sm">Print Report</span>
+                            </Button>
                         </div>
                     </div>
-
-                    <div className="h-12 w-[1px] bg-slate-200 dark:bg-slate-700 hidden md:block" />
-
-                    <Button
-                        onClick={handlePrint}
-                        variant="outline"
-                        className="h-10 px-4 rounded-xl border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-cyan-50 hover:text-cyan-700 hover:border-cyan-200 transition-all gap-2"
-                    >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                        </svg>
-                        <span className="hidden lg:inline font-semibold text-sm">Print Report</span>
-                    </Button>
                 </div>
-            </div>
 
-            {/* Vital Monitors */}
-            <div>
-                <div className="flex items-center justify-between mb-4 px-1">
-                    <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-[0.1em] flex items-center gap-2">
-                        Vital Monitors
-                    </h3>
-                    <div className="flex items-center gap-2 px-3 py-1 rounded-full clay-inset bg-emerald-50 dark:bg-emerald-900/10">
-                        <span className="relative flex h-2 w-2">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                        </span>
-                        <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 tracking-wider">LIVE</span>
+                {/* Vital Monitors */}
+                <div>
+                    <div className="flex items-center justify-between mb-4 px-1">
+                        <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-[0.1em] flex items-center gap-2">
+                            Vital Monitors
+                        </h3>
+                        <div className="flex items-center gap-2 px-3 py-1 rounded-full clay-inset bg-emerald-50 dark:bg-emerald-900/10">
+                            <span className="relative flex h-2 w-2">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                            </span>
+                            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 tracking-wider">LIVE</span>
+                        </div>
                     </div>
-                </div>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-                    {/* Heart Rate - With ECG Visual */}
-                    {/* Heart Rate - With ECG Visual - Split Layout */}
-                    <div className="clay-card flex flex-col justify-between p-5 h-40 relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
-                        {/* Top Section: Data */}
-                        <div className="relative z-10">
-                            <div className="flex justify-between items-start mb-1">
-                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Heart Rate</span>
-                                <div className="p-1.5 rounded-full bg-rose-50 dark:bg-rose-900/20 text-rose-500">
-                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+                        {/* Heart Rate - With ECG Visual */}
+                        {/* Heart Rate - With ECG Visual - Split Layout */}
+                        <div className="clay-card flex flex-col justify-between p-5 h-40 relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
+                            {/* Top Section: Data */}
+                            <div className="relative z-10">
+                                <div className="flex justify-between items-start mb-1">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Heart Rate</span>
+                                    <div className="p-1.5 rounded-full bg-rose-50 dark:bg-rose-900/20 text-rose-500">
+                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>
+                                    </div>
+                                </div>
+                                <div className="flex items-baseline gap-1.5">
+                                    <span className="text-4xl font-black text-rose-600 dark:text-rose-400 tracking-tight">{vitals.hr}</span>
+                                    <span className="text-sm text-slate-500 font-bold">bpm</span>
+                                </div>
+                            </div>
+
+                            {/* Bottom Section: Monitor */}
+                            <div className="absolute inset-x-0 bottom-0 h-20 w-full opacity-100 pointer-events-none">
+                                <ECGMonitor className="w-full h-full" color="#f43f5e" bpm={vitals.hr} />
+                            </div>
+                        </div>
+
+                        {/* Blood Pressure */}
+                        <div className="clay-card p-5 hover:-translate-y-1 transition-transform duration-300">
+                            <div className="flex justify-between items-start mb-2">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Blood Pressure</span>
+                                <div className="p-1.5 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-500">
+                                    {/* Icon */}
                                 </div>
                             </div>
                             <div className="flex items-baseline gap-1.5">
-                                <span className="text-4xl font-black text-rose-600 dark:text-rose-400 tracking-tight">{vitals.hr}</span>
-                                <span className="text-sm text-slate-500 font-bold">bpm</span>
+                                <span className="text-2xl font-bold text-slate-800 dark:text-white tracking-tight">{vitals.bpSys}/{vitals.bpDia}</span>
+                                <span className="text-xs text-slate-500 font-medium">mmHg</span>
                             </div>
                         </div>
 
-                        {/* Bottom Section: Monitor */}
-                        <div className="absolute inset-x-0 bottom-0 h-20 w-full opacity-100 pointer-events-none">
-                            <ECGMonitor className="w-full h-full" color="#f43f5e" bpm={vitals.hr} />
-                        </div>
-                    </div>
-
-                    {/* Blood Pressure */}
-                    <div className="clay-card p-5 hover:-translate-y-1 transition-transform duration-300">
-                        <div className="flex justify-between items-start mb-2">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Blood Pressure</span>
-                            <div className="p-1.5 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-500">
-                                {/* Icon */}
+                        {/* SpO2 */}
+                        <div className="clay-card p-5 hover:-translate-y-1 transition-transform duration-300">
+                            <div className="flex justify-between items-start mb-2">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">SpO2</span>
+                                <div className="p-1.5 rounded-full bg-cyan-50 dark:bg-cyan-900/20 text-cyan-600">
+                                    {/* Icon */}
+                                </div>
+                            </div>
+                            <div className="flex items-baseline gap-1.5">
+                                <span className="text-3xl font-bold text-cyan-600 dark:text-cyan-400 tracking-tight">{vitals.spo2}</span>
+                                <span className="text-xs text-slate-500 font-medium">%</span>
                             </div>
                         </div>
-                        <div className="flex items-baseline gap-1.5">
-                            <span className="text-2xl font-bold text-slate-800 dark:text-white tracking-tight">{vitals.bpSys}/{vitals.bpDia}</span>
-                            <span className="text-xs text-slate-500 font-medium">mmHg</span>
-                        </div>
-                    </div>
 
-                    {/* SpO2 */}
-                    <div className="clay-card p-5 hover:-translate-y-1 transition-transform duration-300">
-                        <div className="flex justify-between items-start mb-2">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">SpO2</span>
-                            <div className="p-1.5 rounded-full bg-cyan-50 dark:bg-cyan-900/20 text-cyan-600">
-                                {/* Icon */}
+                        {/* Temp */}
+                        <div className="clay-card p-5 hover:-translate-y-1 transition-transform duration-300">
+                            <div className="flex justify-between items-start mb-2">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Temp</span>
+                                <div className="p-1.5 rounded-full bg-emerald-50 dark:bg-emerald-900/20 text-emerald-500">
+                                    {/* Icon */}
+                                </div>
                             </div>
-                        </div>
-                        <div className="flex items-baseline gap-1.5">
-                            <span className="text-3xl font-bold text-cyan-600 dark:text-cyan-400 tracking-tight">{vitals.spo2}</span>
-                            <span className="text-xs text-slate-500 font-medium">%</span>
-                        </div>
-                    </div>
-
-                    {/* Temp */}
-                    <div className="clay-card p-5 hover:-translate-y-1 transition-transform duration-300">
-                        <div className="flex justify-between items-start mb-2">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Temp</span>
-                            <div className="p-1.5 rounded-full bg-emerald-50 dark:bg-emerald-900/20 text-emerald-500">
-                                {/* Icon */}
+                            <div className="flex items-baseline gap-1.5">
+                                <span className="text-3xl font-bold text-slate-800 dark:text-white tracking-tight">{vitals.temp}</span>
+                                <span className="text-xs text-slate-500 font-medium">°F</span>
                             </div>
-                        </div>
-                        <div className="flex items-baseline gap-1.5">
-                            <span className="text-3xl font-bold text-slate-800 dark:text-white tracking-tight">{vitals.temp}</span>
-                            <span className="text-xs text-slate-500 font-medium">°F</span>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            {/* Assessment Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-                <div className="clay-card p-6">
-                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-[0.2em] mb-4">Reported Symptoms</h3>
-                    <div className="flex flex-wrap gap-2">
-                        {patient.symptoms?.map((symptom, i) => (
-                            <Badge key={i} variant="secondary" className="px-3 py-1.5 bg-slate-100 dark:bg-slate-700/50 text-slate-600 dark:text-slate-300 border-0 transition-all hover:scale-105 cursor-default shadow-sm">
-                                {symptom}
-                            </Badge>
+                {/* Assessment Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+                    <div className="clay-card p-6">
+                        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-[0.2em] mb-4">Reported Symptoms</h3>
+                        <div className="flex flex-wrap gap-2">
+                            {patient.symptoms?.map((symptom, i) => (
+                                <Badge key={i} variant="secondary" className="px-3 py-1.5 bg-slate-100 dark:bg-slate-700/50 text-slate-600 dark:text-slate-300 border-0 transition-all hover:scale-105 cursor-default shadow-sm">
+                                    {symptom}
+                                </Badge>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="clay-card p-6 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 blur-3xl rounded-full group-hover:bg-cyan-500/20 transition-all duration-1000" />
+                        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-[0.2em] mb-4">AI Diagnosis</h3>
+                        <div className="flex items-center justify-between relative z-10">
+                            <div>
+                                <div className="font-bold text-slate-800 dark:text-white text-xl tracking-tight">{patient.department}</div>
+                                <div className="text-xs text-slate-500 mt-1">Based on {patient.symptoms?.length} key markers</div>
+                            </div>
+                            <div className="text-right">
+                                <div className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">~{patient.waitingTime + 5}m</div>
+                                <div className="text-[10px] text-slate-400 uppercase tracking-wider">Est. Wait</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Resource Allocation */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+                    <div className="clay-card p-6">
+                        <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+                            <svg className="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                            Room Assignment
+                        </h3>
+                        <div className="flex items-center justify-between bg-blue-50 dark:bg-blue-900/10 p-4 rounded-xl border border-blue-100 dark:border-blue-900/30">
+                            <div>
+                                <div className="text-[10px] font-bold text-blue-400 uppercase tracking-wider mb-1">Allocated Unit</div>
+                                <div className="text-lg font-bold text-slate-800 dark:text-white">
+                                    {patient.allocatedRoom || "Assigning..."}
+                                </div>
+                            </div>
+                            <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-800 flex items-center justify-center text-blue-600 dark:text-blue-200">
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="clay-card p-6">
+                        <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+                            <svg className="w-4 h-4 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>
+                            Required Labs
+                        </h3>
+                        <div className="space-y-2">
+                            {(patient.requiredLabs || []).length > 0 ? (
+                                patient.requiredLabs?.map((lab, i) => (
+                                    <div key={i} className="flex items-center justify-between text-sm p-2 rounded-lg bg-slate-50 dark:bg-slate-800/50">
+                                        <span className="font-medium text-slate-700 dark:text-slate-300">{lab}</span>
+                                        <Badge variant="outline" className="text-[10px] border-amber-200 text-amber-600 bg-amber-50">Pending</Badge>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="text-sm text-slate-400 italic">No specific labs ordered</div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                {/* AI Analysis - Dark Table */}
+                <div className="space-y-4">
+                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-[0.2em] pl-1">Risk Factors Analysis</h3>
+                    <div className="clay-card overflow-hidden">
+                        {factors.map((factor, index) => (
+                            <div key={index} className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
+                                <span className="font-medium text-sm text-slate-700 dark:text-slate-300">{factor.name}</span>
+                                <div className="flex items-center gap-4">
+                                    <span className="text-xs text-slate-500 font-mono">{factor.value}</span>
+                                    <div className="w-24 h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                                        <div
+                                            className={cn("h-full rounded-full shadow-sm", factor.isPositive ? "bg-emerald-500" : "bg-red-500")}
+                                            style={{ width: `${factor.impact}%` }}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
                         ))}
                     </div>
                 </div>
 
-                <div className="clay-card p-6 relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 blur-3xl rounded-full group-hover:bg-cyan-500/20 transition-all duration-1000" />
-                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-[0.2em] mb-4">AI Diagnosis</h3>
-                    <div className="flex items-center justify-between relative z-10">
-                        <div>
-                            <div className="font-bold text-slate-800 dark:text-white text-xl tracking-tight">{patient.department}</div>
-                            <div className="text-xs text-slate-500 mt-1">Based on {patient.symptoms?.length} key markers</div>
-                        </div>
-                        <div className="text-right">
-                            <div className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">~{patient.waitingTime + 5}m</div>
-                            <div className="text-[10px] text-slate-400 uppercase tracking-wider">Est. Wait</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* AI Analysis - Dark Table */}
-            <div className="space-y-4">
-                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-[0.2em] pl-1">Risk Factors Analysis</h3>
-                <div className="clay-card overflow-hidden">
-                    {factors.map((factor, index) => (
-                        <div key={index} className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
-                            <span className="font-medium text-sm text-slate-700 dark:text-slate-300">{factor.name}</span>
-                            <div className="flex items-center gap-4">
-                                <span className="text-xs text-slate-500 font-mono">{factor.value}</span>
-                                <div className="w-24 h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                                    <div
-                                        className={cn("h-full rounded-full shadow-sm", factor.isPositive ? "bg-emerald-500" : "bg-red-500")}
-                                        style={{ width: `${factor.impact}%` }}
-                                    />
+                {/* Status Toast */}
+                {statusMessage && (
+                    <div className={cn(
+                        "fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-xl shadow-2xl border backdrop-blur-lg",
+                        "animate-in slide-in-from-bottom-4 fade-in duration-300",
+                        statusMessage.type === 'success'
+                            ? 'bg-emerald-950/90 border-emerald-500/30 text-emerald-200'
+                            : 'bg-blue-950/90 border-blue-500/30 text-blue-200'
+                    )}>
+                        <div className="flex items-center gap-3">
+                            {statusMessage.type === 'success' && (
+                                <div className="h-5 w-5 rounded-full bg-emerald-500 flex items-center justify-center">
+                                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
                                 </div>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
-
-            {/* Status Toast */}
-            {statusMessage && (
-                <div className={cn(
-                    "fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-xl shadow-2xl border backdrop-blur-lg",
-                    "animate-in slide-in-from-bottom-4 fade-in duration-300",
-                    statusMessage.type === 'success'
-                        ? 'bg-emerald-950/90 border-emerald-500/30 text-emerald-200'
-                        : 'bg-blue-950/90 border-blue-500/30 text-blue-200'
-                )}>
-                    <div className="flex items-center gap-3">
-                        {statusMessage.type === 'success' && (
-                            <div className="h-5 w-5 rounded-full bg-emerald-500 flex items-center justify-center">
-                                <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
-                            </div>
-                        )}
-                        <span className="text-sm font-semibold">{statusMessage.text}</span>
-                    </div>
-                </div>
-            )}
-
-            {/* Actions Footer */}
-            <div className="flex gap-4 pt-4 mt-auto">
-                <Button
-                    onClick={handleMarkAttended}
-                    disabled={isAttended}
-                    className={cn(
-                        "flex-1 h-12 rounded-xl font-bold tracking-wide clay-button border-0 shadow-lg transition-all duration-500",
-                        isAttended
-                            ? "bg-emerald-600 hover:bg-emerald-600 text-white shadow-emerald-900/20 cursor-default"
-                            : "bg-cyan-700 hover:bg-cyan-600 text-white shadow-cyan-900/20"
-                    )}
-                    size="lg"
-                >
-                    {isAttended ? (
-                        <span className="flex items-center gap-2">
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                            ATTENDED
-                        </span>
-                    ) : (
-                        'MARK ATTENDED'
-                    )}
-                </Button>
-
-                <Button
-                    onClick={() => setShowTransferDialog(true)}
-                    disabled={transferComplete}
-                    variant="outline"
-                    className={cn(
-                        "flex-1 h-12 rounded-xl clay-button transition-all duration-500",
-                        transferComplete
-                            ? "bg-blue-600 hover:bg-blue-600 text-white border-blue-500 cursor-default"
-                            : "border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 hover:bg-slate-50"
-                    )}
-                    size="lg"
-                >
-                    {transferComplete ? (
-                        <span className="flex items-center gap-2">
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                            TRANSFERRED
-                        </span>
-                    ) : (
-                        'TRANSFER'
-                    )}
-                </Button>
-            </div>
-
-            {/* Transfer Confirmation Dialog */}
-            <Dialog open={showTransferDialog} onOpenChange={setShowTransferDialog}>
-                <DialogContent className="sm:max-w-md bg-slate-950 border-slate-800">
-                    <DialogHeader>
-                        <DialogTitle className="text-white text-xl">Confirm Patient Transfer</DialogTitle>
-                        <DialogDescription className="text-slate-400">
-                            You are about to transfer <span className="text-white font-semibold">{patient.name}</span> to the following department.
-                        </DialogDescription>
-                    </DialogHeader>
-
-                    <div className="my-4 p-4 rounded-xl bg-blue-950/50 border border-blue-500/20">
-                        <div className="text-[10px] text-blue-400 font-bold uppercase tracking-wider mb-1">Recommended Department</div>
-                        <div className="text-xl font-bold text-white">{patient.department}</div>
-                        <div className="flex items-center gap-4 mt-3 text-sm">
-                            <span className="text-slate-400">Est. Wait: <span className="text-white font-semibold">{patient.waitingTime}m</span></span>
-                            <span className="text-slate-400">Risk: <span className={cn(
-                                "font-semibold",
-                                patient.riskLevel === 'high' ? 'text-red-400' : patient.riskLevel === 'medium' ? 'text-amber-400' : 'text-emerald-400'
-                            )}>{patient.riskLevel.toUpperCase()}</span></span>
-                        </div>
-                    </div>
-
-                    <DialogFooter className="gap-3 sm:gap-3">
-                        <DialogClose asChild>
-                            <Button variant="outline" className="border-slate-700 text-slate-300 hover:bg-slate-800">
-                                Cancel
-                            </Button>
-                        </DialogClose>
-                        <Button
-                            onClick={handleTransferConfirm}
-                            disabled={isTransferring}
-                            className="bg-blue-600 hover:bg-blue-500 text-white font-bold"
-                        >
-                            {isTransferring ? (
-                                <span className="flex items-center gap-2">
-                                    <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                                    Transferring...
-                                </span>
-                            ) : (
-                                'Confirm Transfer'
                             )}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-        </div>
+                            <span className="text-sm font-semibold">{statusMessage.text}</span>
+                        </div>
+                    </div>
+                )}
+
+                {/* Actions Footer */}
+                <div className="flex gap-4 pt-4 mt-auto">
+                    <Button
+                        onClick={handleMarkAttended}
+                        disabled={isAttended}
+                        className={cn(
+                            "flex-1 h-12 rounded-xl font-bold tracking-wide clay-button border-0 shadow-lg transition-all duration-500",
+                            isAttended
+                                ? "bg-emerald-600 hover:bg-emerald-600 text-white shadow-emerald-900/20 cursor-default"
+                                : "bg-cyan-700 hover:bg-cyan-600 text-white shadow-cyan-900/20"
+                        )}
+                        size="lg"
+                    >
+                        {isAttended ? (
+                            <span className="flex items-center gap-2">
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                                ATTENDED
+                            </span>
+                        ) : (
+                            'MARK ATTENDED'
+                        )}
+                    </Button>
+
+                    <Button
+                        onClick={() => setShowTransferDialog(true)}
+                        disabled={transferComplete}
+                        variant="outline"
+                        className={cn(
+                            "flex-1 h-12 rounded-xl clay-button transition-all duration-500",
+                            transferComplete
+                                ? "bg-blue-600 hover:bg-blue-600 text-white border-blue-500 cursor-default"
+                                : "border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 hover:bg-slate-50"
+                        )}
+                        size="lg"
+                    >
+                        {transferComplete ? (
+                            <span className="flex items-center gap-2">
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                                TRANSFERRED
+                            </span>
+                        ) : (
+                            'TRANSFER'
+                        )}
+                    </Button>
+                </div>
+
+                {/* Transfer Confirmation Dialog */}
+                <Dialog open={showTransferDialog} onOpenChange={setShowTransferDialog}>
+                    <DialogContent className="sm:max-w-md bg-slate-950 border-slate-800">
+                        <DialogHeader>
+                            <DialogTitle className="text-white text-xl">Confirm Patient Transfer</DialogTitle>
+                            <DialogDescription className="text-slate-400">
+                                You are about to transfer <span className="text-white font-semibold">{patient.name}</span> to the following department.
+                            </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="my-4 p-4 rounded-xl bg-blue-950/50 border border-blue-500/20">
+                            <div className="text-[10px] text-blue-400 font-bold uppercase tracking-wider mb-1">Recommended Department</div>
+                            <div className="text-xl font-bold text-white">{patient.department}</div>
+                            <div className="flex items-center gap-4 mt-3 text-sm">
+                                <span className="text-slate-400">Est. Wait: <span className="text-slate-800 dark:text-white font-semibold">{patient.waitingTime}m</span></span>
+                                <span className="text-slate-400">Risk: <span className={cn(
+                                    "font-bold",
+                                    patient.riskLevel === "high" ? "text-red-500" :
+                                        patient.riskLevel === "medium" ? "text-amber-500" : "text-emerald-500"
+                                )}>
+                                    {patient.riskLevel.toUpperCase()}
+                                </span></span>
+                            </div>
+                        </div>
+
+                        <DialogFooter className="gap-3 sm:gap-3">
+                            <DialogClose asChild>
+                                <Button variant="outline" className="border-slate-700 text-slate-300 hover:bg-slate-800">
+                                    Cancel
+                                </Button>
+                            </DialogClose>
+                            <Button
+                                onClick={handleTransferConfirm}
+                                disabled={isTransferring}
+                                className="bg-blue-600 hover:bg-blue-500 text-white font-bold"
+                            >
+                                {isTransferring ? (
+                                    <span className="flex items-center gap-2">
+                                        <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                        Transferring...
+                                    </span>
+                                ) : (
+                                    'Confirm Transfer'
+                                )}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog >
+            </div >
+        </div >
     )
 }

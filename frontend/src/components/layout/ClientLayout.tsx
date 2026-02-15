@@ -4,6 +4,7 @@ import * as React from "react"
 import { usePathname } from "next/navigation"
 import { Sidebar } from "@/components/layout/Sidebar"
 import { TopNavbar } from "@/components/layout/TopNavbar"
+import { ThemeProvider } from "@/components/providers/ThemeProvider"
 
 export function ClientLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname()
@@ -19,15 +20,17 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
     }
 
     return (
-        <div className="flex min-h-screen bg-background relative">
-            <Sidebar />
-            {/* Main Content Area */}
-            <div className="flex-1 flex flex-col w-full md:pl-64 transition-all duration-300 ease-in-out">
-                <TopNavbar />
-                <main className="flex-1 p-4 md:p-6 bg-secondary/30 text-foreground overflow-x-hidden">
-                    {children}
-                </main>
+        <ThemeProvider defaultTheme="light" storageKey="hospital-theme">
+            <div className="flex min-h-screen bg-background relative transition-colors duration-300">
+                <Sidebar />
+                {/* Main Content Area */}
+                <div className="flex-1 flex flex-col w-full md:pl-64 transition-all duration-300 ease-in-out">
+                    <TopNavbar />
+                    <main className="flex-1 p-4 md:p-6 bg-secondary/30 text-foreground overflow-x-hidden">
+                        {children}
+                    </main>
+                </div>
             </div>
-        </div>
+        </ThemeProvider>
     )
 }

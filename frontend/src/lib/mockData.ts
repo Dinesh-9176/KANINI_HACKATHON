@@ -25,6 +25,26 @@ export interface Patient {
     // Optional fields from backend API
     contributingFactors?: ContributingFactor[]
     predictedDisease?: string
+
+    // Resource Allocation
+    allocatedRoom?: string // e.g., "Trauma Bay 1", "General Ward 3B"
+    requiredLabs?: string[] // e.g., ["Blood Test", "X-Ray", "CT Scan"]
+}
+
+export interface Room {
+    id: string
+    name: string
+    type: "ICU" | "Trauma" | "General" | "Isolation"
+    isOccupied: boolean
+    patientId?: string
+}
+
+export interface Lab {
+    id: string
+    name: string
+    type: "Imaging" | "Pathology" | "Cardiology"
+    status: "Available" | "Busy" | "Maintenance"
+    queueLength: number
 }
 
 export const mockPatients: Patient[] = [
@@ -262,4 +282,21 @@ export const mockPatients: Patient[] = [
         symptoms: ["Muscle strain", "Back pain", "Joint stiffness"],
         vitals: { hr: 70, bp: "118/78", spo2: 99, temp: 98.6 }
     }
+]
+
+export const mockRooms: Room[] = [
+    { id: "R-101", name: "Trauma Bay 1", type: "Trauma", isOccupied: true, patientId: "P-1027" },
+    { id: "R-102", name: "Trauma Bay 2", type: "Trauma", isOccupied: false },
+    { id: "ICU-01", name: "ICU Bed 1", type: "ICU", isOccupied: true, patientId: "P-1029" },
+    { id: "ICU-02", name: "ICU Bed 2", type: "ICU", isOccupied: false },
+    { id: "ICU-03", name: "ICU Bed 3", type: "ICU", isOccupied: false },
+    { id: "GW-10", name: "Ward 3B", type: "General", isOccupied: true, patientId: "P-1024" },
+    { id: "GW-11", name: "Ward 3C", type: "General", isOccupied: false },
+]
+
+export const mockLabs: Lab[] = [
+    { id: "LAB-01", name: "X-Ray Room A", type: "Imaging", status: "Available", queueLength: 2 },
+    { id: "LAB-02", name: "CT Scan", type: "Imaging", status: "Busy", queueLength: 5 },
+    { id: "LAB-03", name: "Blood Lab", type: "Pathology", status: "Available", queueLength: 0 },
+    { id: "LAB-04", name: "ECG Room", type: "Cardiology", status: "Available", queueLength: 1 },
 ]

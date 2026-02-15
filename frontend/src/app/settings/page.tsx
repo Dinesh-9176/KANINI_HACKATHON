@@ -9,84 +9,93 @@ import { Slider } from "@/components/ui/slider"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { Input } from "@/components/ui/input"
+import { useTheme } from "@/components/providers/ThemeProvider"
 
 export default function SettingsPage() {
     const [riskThreshold, setRiskThreshold] = React.useState([85])
+    const { theme, setTheme } = useTheme()
+
+    // Toggle Dark Mode
+    const toggleTheme = (checked: boolean) => {
+        setTheme(checked ? "dark" : "light")
+    }
+
+    const isDarkMode = theme === "dark"
 
     return (
-        <div className="space-y-6 max-w-4xl mx-auto">
+        <div className="space-y-6 max-w-4xl mx-auto pb-10">
             <div>
-                <h2 className="text-3xl font-bold tracking-tight">Settings</h2>
-                <p className="text-muted-foreground">Manage your hospital dashboard preferences and configurations.</p>
+                <h2 className="text-3xl font-bold tracking-tight text-foreground">Settings</h2>
+                <p className="text-muted-foreground">Manage your profile, preferences, and system configurations.</p>
             </div>
 
-            <div className="grid gap-6">
-                {/* 1️⃣ Department Management */}
+            {/* 1️⃣ Profile Section (Enhanced) */}
+            <Card className="border-l-4 border-l-cyan-500 shadow-sm">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-xl">
+                        <User className="h-6 w-6 text-cyan-600" />
+                        User Profile
+                    </CardTitle>
+                    <CardDescription>Manage your account details and role.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    <div className="flex flex-col md:flex-row gap-6 items-start">
+                        <div className="flex-shrink-0">
+                            <div className="h-24 w-24 rounded-full bg-cyan-100 flex items-center justify-center text-cyan-700 text-3xl font-bold shadow-inner">
+                                DS
+                            </div>
+                        </div>
+                        <div className="grid gap-4 flex-1 w-full md:grid-cols-2">
+                            <div className="space-y-2">
+                                <Label>Display Name</Label>
+                                <Input defaultValue="Dr. Sarah Smith" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Professional Title</Label>
+                                <Input defaultValue="Chief Medical Officer" readOnly className="bg-slate-50 text-muted-foreground" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Email Address</Label>
+                                <Input defaultValue="dr.smith@hospitalsystem.com" readOnly className="bg-slate-50 text-muted-foreground" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Role</Label>
+                                <div className="flex items-center gap-2 px-3 py-2 border rounded-md bg-slate-50 text-sm text-muted-foreground">
+                                    <ShieldAlert className="h-4 w-4 text-amber-500" />
+                                    <span>System Administrator</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </CardContent>
+                <CardFooter className="flex justify-between border-t bg-slate-50/50 p-6">
+                    <Button variant="outline">Change Password</Button>
+                    <Button>Save Changes</Button>
+                </CardFooter>
+            </Card>
+
+            <div className="grid gap-6 md:grid-cols-2">
+                {/* 2️⃣ Appearance */}
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
-                            <Building className="h-5 w-5" />
-                            Department Management
+                            {isDarkMode ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+                            Appearance
                         </CardTitle>
-                        <CardDescription>Configure active departments and capacity limits.</CardDescription>
+                        <CardDescription>Customize the interface theme.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        <div className="flex items-center justify-between border-b pb-4">
-                            <div className="space-y-0.5">
-                                <Label className="text-base">Cardiology</Label>
-                                <p className="text-sm text-muted-foreground">Capacity: 45 beds</p>
-                            </div>
-                            <Switch defaultChecked />
-                        </div>
-                        <div className="flex items-center justify-between border-b pb-4">
-                            <div className="space-y-0.5">
-                                <Label className="text-base">Emergency Room</Label>
-                                <p className="text-sm text-muted-foreground">Capacity: 20 beds • High Priority</p>
-                            </div>
-                            <Switch defaultChecked disabled />
-                        </div>
                         <div className="flex items-center justify-between">
                             <div className="space-y-0.5">
-                                <Label className="text-base">Pediatrics</Label>
-                                <p className="text-sm text-muted-foreground">Capacity: 30 beds</p>
+                                <Label className="text-base">Dark Mode</Label>
+                                <p className="text-xs text-muted-foreground">Switch between light and dark themes.</p>
                             </div>
-                            <Switch />
-                        </div>
-                    </CardContent>
-                    <CardFooter>
-                        <Button variant="outline" className="w-full">Manage All Departments</Button>
-                    </CardFooter>
-                </Card>
-
-                {/* 2️⃣ Risk Threshold Settings */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <ShieldAlert className="h-5 w-5" />
-                            AI Risk Thresholds
-                        </CardTitle>
-                        <CardDescription>Set the sensitivity for AI risk flagging.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                        <div className="space-y-4">
-                            <div className="flex justify-between">
-                                <Label>Critical Alert Threshold</Label>
-                                <span className="text-sm font-medium text-muted-foreground">{riskThreshold}% Probability</span>
-                            </div>
-                            <Slider
-                                value={riskThreshold}
-                                onValueChange={setRiskThreshold}
-                                max={100}
-                                step={1}
-                            />
-                            <p className="text-xs text-muted-foreground">
-                                Patients with AI risk score above {riskThreshold}% will trigger immediate critical alerts.
-                            </p>
+                            <Switch checked={isDarkMode} onCheckedChange={toggleTheme} />
                         </div>
                     </CardContent>
                 </Card>
 
-                {/* 3️⃣ Notification Preferences */}
+                {/* 3️⃣ Notifications */}
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
@@ -101,51 +110,63 @@ export default function SettingsPage() {
                             <Switch id="critical-alerts" defaultChecked />
                         </div>
                         <div className="flex items-center justify-between">
-                            <Label htmlFor="dept-overload">Department Overload Warnings</Label>
+                            <Label htmlFor="dept-overload">Department Overload</Label>
                             <Switch id="dept-overload" defaultChecked />
-                        </div>
-                        <div className="flex items-center justify-between">
-                            <Label htmlFor="email-digest">Daily Email Digest</Label>
-                            <Switch id="email-digest" />
                         </div>
                     </CardContent>
                 </Card>
-
-                {/* 4️⃣ Theme & Profile */}
-                <div className="grid md:grid-cols-2 gap-6">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <Moon className="h-5 w-5" />
-                                Appearance
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="flex items-center justify-between">
-                                <Label>Dark Mode</Label>
-                                <Switch disabled title="Coming soon" />
-                            </div>
-                            <p className="text-xs text-muted-foreground">Dark mode is currently disabled.</p>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <User className="h-5 w-5" />
-                                Profile
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="grid gap-2">
-                                <Label>Display Name</Label>
-                                <Input defaultValue="Dr. Smith" />
-                            </div>
-                            <Button className="w-full">Save Profile</Button>
-                        </CardContent>
-                    </Card>
-                </div>
             </div>
+
+            {/* 4️⃣ AI Risk Configuration */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <ShieldAlert className="h-5 w-5" />
+                        AI Risk Thresholds
+                    </CardTitle>
+                    <CardDescription>Set the sensitivity for automatic risk flagging.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    <div className="space-y-4">
+                        <div className="flex justify-between">
+                            <Label>Critical Alert Threshold</Label>
+                            <span className="text-sm font-medium text-muted-foreground">{riskThreshold}% Probability</span>
+                        </div>
+                        <Slider
+                            value={riskThreshold}
+                            onValueChange={setRiskThreshold}
+                            max={100}
+                            step={1}
+                            className="py-4"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            Patients with AI risk score above {riskThreshold}% will trigger immediate critical alerts to the ER team.
+                        </p>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* 5️⃣ System Info */}
+            <Card className="bg-slate-50 dark:bg-slate-900 border-dashed">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-sm uppercase tracking-wider text-muted-foreground">
+                        System Information
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="flex items-center justify-between text-sm">
+                    <div className="grid gap-1">
+                        <div className="flex gap-2">
+                            <span className="font-semibold">Version:</span>
+                            <span className="text-muted-foreground">v2.4.0 (Stable)</span>
+                        </div>
+                        <div className="flex gap-2">
+                            <span className="font-semibold">Last Updated:</span>
+                            <span className="text-muted-foreground">February 15, 2026</span>
+                        </div>
+                    </div>
+                    <Button variant="outline" size="sm">Check for Updates</Button>
+                </CardContent>
+            </Card>
         </div>
     )
 }

@@ -7,6 +7,7 @@ import {
   Clock,
   AlertTriangle,
   TrendingUp,
+  CheckCircle2,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -26,61 +27,9 @@ import {
   Legend
 } from "recharts"
 import { cn } from "@/lib/utils"
+import { fetchDashboardStats, fetchRiskDistribution, fetchDepartmentLoad, fetchAlerts } from "@/lib/api"
 
-// Mock Data
-const kpiData = [
-  {
-    title: "Total Patients Today",
-    value: "142",
-    trend: "+12%",
-    trendUp: true,
-    icon: Users,
-    color: "text-cyan-600",
-    bg: "bg-cyan-50 dark:bg-cyan-900/20"
-  },
-  {
-    title: "High Risk Count",
-    value: "28",
-    trend: "+5%",
-    trendUp: true,
-    icon: Activity,
-    color: "text-rose-600",
-    bg: "bg-rose-50 dark:bg-rose-900/20"
-  },
-  {
-    title: "Avg Waiting Time",
-    value: "18m",
-    trend: "-2m",
-    trendUp: false,
-    icon: Clock,
-    color: "text-amber-600",
-    bg: "bg-amber-50 dark:bg-amber-900/20"
-  },
-  {
-    title: "Department Load",
-    value: "84%",
-    trend: "+4%",
-    trendUp: true,
-    icon: TrendingUp,
-    color: "text-emerald-600",
-    bg: "bg-emerald-50 dark:bg-emerald-900/20"
-  },
-]
-
-const riskData = [
-  { name: 'High', value: 28, color: '#ef4444' },
-  { name: 'Medium', value: 45, color: '#f97316' },
-  { name: 'Low', value: 69, color: '#22c55e' },
-];
-
-const deptData = [
-  { name: 'General', patients: 45 },
-  { name: 'Cardio', patients: 32 },
-  { name: 'Neuro', patients: 18 },
-  { name: 'Ortho', patients: 24 },
-  { name: 'Peds', patients: 23 },
-];
-
+// Mock Data for fallback / initial state
 const hourlyData = [
   { time: '08:00', patients: 12 },
   { time: '10:00', patients: 28 },
@@ -90,14 +39,84 @@ const hourlyData = [
   { time: '18:00', patients: 25 },
 ];
 
-const alerts = [
-  { id: 1, message: "ER Capacity at 95%", type: "critical", time: "10m ago" },
-  { id: 2, message: "Dr. Smith unavailable for Cardio", type: "warning", time: "25m ago" },
-  { id: 3, message: "Ambulance arriving - 3 trauma cases", type: "critical", time: "2m ago" },
-  { id: 4, message: "Pharmacy stock low on Epinephrine", type: "warning", time: "1h ago" },
-]
-
 export default function DashboardPage() {
+  const [stats, setStats] = React.useState({
+    total_patients: 0,
+    high_risk: 0,
+    avg_wait: 0,
+    department_load: 0
+  })
+  const [riskData, setRiskData] = React.useState<any[]>([])
+  const [deptData, setDeptData] = React.useState<any[]>([])
+  const [alerts, setAlerts] = React.useState<any[]>([])
+  const [loading, setLoading] = React.useState(true)
+
+  React.useEffect(() => {
+    const loadDashboardData = async () => {
+      try {
+        const [statsData, riskDist, deptLoad, alertsData] = await Promise.all([
+          fetchDashboardStats(),
+          fetchRiskDistribution(),
+          fetchDepartmentLoad(),
+          fetchAlerts()
+        ])
+
+        setStats(statsData)
+        setRiskData(riskDist)
+        setDeptData(deptLoad)
+        setAlerts(alertsData)
+      } catch (error) {
+        console.error("Failed to load dashboard data", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadDashboardData()
+    // Refresh every 30 seconds
+    const interval = setInterval(loadDashboardData, 30000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const kpiData = [
+    {
+      title: "Total Patients Today",
+      value: stats.total_patients.toString(),
+      trend: "+12%", // Mock trend for now
+      trendUp: true,
+      icon: Users,
+      color: "text-cyan-600",
+      bg: "bg-cyan-50 dark:bg-cyan-900/20"
+    },
+    {
+      title: "High Risk Count",
+      value: stats.high_risk.toString(),
+      trend: "+5%",
+      trendUp: true,
+      icon: Activity,
+      color: "text-rose-600",
+      bg: "bg-rose-50 dark:bg-rose-900/20"
+    },
+    {
+      title: "Avg Waiting Time",
+      value: `${stats.avg_wait}m`,
+      trend: "-2m",
+      trendUp: false,
+      icon: Clock,
+      color: "text-amber-600",
+      bg: "bg-amber-50 dark:bg-amber-900/20"
+    },
+    {
+      title: "Department Load",
+      value: `${stats.department_load}%`,
+      trend: "+4%",
+      trendUp: true,
+      icon: TrendingUp,
+      color: "text-emerald-600",
+      bg: "bg-emerald-50 dark:bg-emerald-900/20"
+    },
+  ]
+
   const handleDownloadReport = () => {
     const now = new Date()
     const reportDate = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
@@ -145,7 +164,7 @@ export default function DashboardPage() {
 <body>
   <div class="header">
     <div class="date">Generated<br><strong>${reportDate} at ${reportTime}</strong></div>
-    <h1>\u{1F3E5} Hospital Dashboard Report</h1>
+    <h1>🏥 Hospital Dashboard Report</h1>
     <div class="sub">Hospital System — Daily Performance Summary</div>
   </div>
 
@@ -221,7 +240,7 @@ export default function DashboardPage() {
 
   <div class="footer">
     <p>This report was generated by the Hospital System dashboard. Data reflects real-time metrics at time of generation.</p>
-    <p style="margin-top: 4px;">\u00A9 ${now.getFullYear()} Hospital System · Confidential</p>
+    <p style="margin-top: 4px;">© ${now.getFullYear()} Hospital System · Confidential</p>
   </div>
 </body>
 </html>`
@@ -252,140 +271,156 @@ export default function DashboardPage() {
         </Button>
       </div>
 
-      {/* KPI Stats */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {kpiData.map((kpi, index) => (
-          <div key={index} className="clay-card p-5 hover:-translate-y-1 transition-transform duration-300">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{kpi.title}</span>
-              <div className={cn("p-2 rounded-xl", kpi.bg)}>
-                <kpi.icon className={cn("h-4 w-4", kpi.color)} />
-              </div>
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">{kpi.value}</span>
-              <Badge
-                variant="secondary"
-                className={cn(
-                  "rounded-full px-2 py-0.5 text-[10px] font-bold border-0",
-                  kpi.trendUp
-                    ? kpi.title === "Avg Waiting Time"
-                      ? "bg-emerald-50 text-emerald-600"
-                      : "bg-emerald-50 text-emerald-600"
-                    : kpi.title === "Avg Waiting Time"
-                      ? "bg-emerald-50 text-emerald-600"
-                      : "bg-rose-50 text-rose-600"
-                )}
-              >
-                {kpi.trend}
-              </Badge>
-            </div>
-            <p className="text-[11px] text-slate-400 mt-1">from yesterday</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Charts Row */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        {/* Risk Distribution - Pie */}
-        <ChartContainer title="Risk Distribution" description="Current patient risk analysis" className="col-span-3">
-          <PieChart>
-            <Pie
-              data={riskData}
-              cx="50%"
-              cy="50%"
-              innerRadius={60}
-              outerRadius={80}
-              paddingAngle={5}
-              dataKey="value"
-            >
-              {riskData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={entry.color} />
-              ))}
-            </Pie>
-            <Tooltip
-              contentStyle={{ background: '#0f172a', border: 'none', borderRadius: '12px', fontSize: '12px', color: '#e2e8f0' }}
-            />
-            <Legend verticalAlign="bottom" height={36} />
-          </PieChart>
-        </ChartContainer>
-
-        {/* Department Load - Bar */}
-        <ChartContainer title="Department Load" description="Patient count by department" className="col-span-4">
-          <BarChart data={deptData}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-            <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: '#94a3b8' }} />
-            <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: '#94a3b8' }} />
-            <Tooltip
-              cursor={{ fill: 'rgba(14, 116, 144, 0.05)' }}
-              contentStyle={{ background: '#0f172a', border: 'none', borderRadius: '12px', fontSize: '12px', color: '#e2e8f0' }}
-            />
-            <Bar dataKey="patients" fill="#0e7490" radius={[6, 6, 0, 0]} />
-          </BarChart>
-        </ChartContainer>
-      </div>
-
-      {/* Bottom Row - Hourly & Alerts */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        {/* Hourly Inflow - Line */}
-        <ChartContainer title="Hourly Patient Inflow" description="Admission trends today" className="col-span-4">
-          <LineChart data={hourlyData}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-            <XAxis dataKey="time" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: '#94a3b8' }} />
-            <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: '#94a3b8' }} />
-            <Tooltip
-              contentStyle={{ background: '#0f172a', border: 'none', borderRadius: '12px', fontSize: '12px', color: '#e2e8f0' }}
-            />
-            <Line
-              type="monotone"
-              dataKey="patients"
-              stroke="#0e7490"
-              strokeWidth={3}
-              dot={{ r: 4, fill: "#fff", stroke: "#0e7490", strokeWidth: 2 }}
-              activeDot={{ r: 6, fill: "#0e7490" }}
-            />
-          </LineChart>
-        </ChartContainer>
-
-        {/* Critical Alerts Panel */}
-        <div className="clay-card col-span-3 p-6">
-          <div className="mb-4">
-            <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-[0.1em] flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-rose-500 animate-pulse" />
-              Critical Alerts
-            </h3>
-          </div>
-          <div className="space-y-3 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
-            {alerts.map((alert) => (
-              <div
-                key={alert.id}
-                className={cn(
-                  "flex items-start gap-3 p-3 rounded-xl border-l-4 bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors",
-                  alert.type === 'critical' ? 'border-l-rose-500' : 'border-l-amber-500'
-                )}
-              >
-                <div className="flex-1 space-y-1">
-                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 leading-none">
-                    {alert.message}
-                  </p>
-                  <p className="text-[11px] text-slate-400">
-                    {alert.time}
-                  </p>
+      {loading ? (
+        <div className="flex flex-col items-center justify-center py-20">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-700"></div>
+          <p className="mt-4 text-slate-500 font-medium animate-pulse">Loading Dashboard Data...</p>
+        </div>
+      ) : (
+        <>
+          {/* KPI Stats */}
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {kpiData.map((kpi, index) => (
+              <div key={index} className="clay-card p-5 hover:-translate-y-1 transition-transform duration-300">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{kpi.title}</span>
+                  <div className={cn("p-2 rounded-xl", kpi.bg)}>
+                    <kpi.icon className={cn("h-4 w-4", kpi.color)} />
+                  </div>
                 </div>
-                {alert.type === 'critical' && (
-                  <span className="relative flex h-2 w-2 mt-1.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
-                  </span>
-                )}
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">{kpi.value}</span>
+                  <Badge
+                    variant="secondary"
+                    className={cn(
+                      "rounded-full px-2 py-0.5 text-[10px] font-bold border-0",
+                      kpi.trendUp
+                        ? kpi.title === "Avg Waiting Time"
+                          ? "bg-emerald-50 text-emerald-600"
+                          : "bg-emerald-50 text-emerald-600"
+                        : kpi.title === "Avg Waiting Time"
+                          ? "bg-emerald-50 text-emerald-600"
+                          : "bg-rose-50 text-rose-600"
+                    )}
+                  >
+                    {kpi.trend}
+                  </Badge>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">from yesterday</p>
               </div>
             ))}
-            <Button variant="outline" className="w-full text-xs h-8 rounded-xl border-slate-200 text-slate-500 hover:text-cyan-700 hover:border-cyan-200">
-              View All Alerts
-            </Button>
           </div>
-        </div>
-      </div>
+
+          {/* Charts Row */}
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+            {/* Risk Distribution - Pie */}
+            <ChartContainer title="Risk Distribution" description="Current patient risk analysis" className="col-span-3">
+              <PieChart>
+                <Pie
+                  data={riskData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={80}
+                  paddingAngle={5}
+                  dataKey="value"
+                >
+                  {riskData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{ background: '#0f172a', border: 'none', borderRadius: '12px', fontSize: '12px', color: '#e2e8f0' }}
+                />
+                <Legend verticalAlign="bottom" height={36} />
+              </PieChart>
+            </ChartContainer>
+
+            {/* Department Load - Bar */}
+            <ChartContainer title="Department Load" description="Patient count by department" className="col-span-4">
+              <BarChart data={deptData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: '#94a3b8' }} />
+                <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: '#94a3b8' }} />
+                <Tooltip
+                  cursor={{ fill: 'rgba(14, 116, 144, 0.05)' }}
+                  contentStyle={{ background: '#0f172a', border: 'none', borderRadius: '12px', fontSize: '12px', color: '#e2e8f0' }}
+                />
+                <Bar dataKey="patients" fill="#0e7490" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ChartContainer>
+          </div>
+
+          {/* Bottom Row - Hourly & Alerts */}
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+            {/* Hourly Inflow - Line */}
+            <ChartContainer title="Hourly Patient Inflow" description="Admission trends today" className="col-span-4">
+              <LineChart data={hourlyData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <XAxis dataKey="time" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: '#94a3b8' }} />
+                <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: '#94a3b8' }} />
+                <Tooltip
+                  contentStyle={{ background: '#0f172a', border: 'none', borderRadius: '12px', fontSize: '12px', color: '#e2e8f0' }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="patients"
+                  stroke="#0e7490"
+                  strokeWidth={3}
+                  dot={{ r: 4, fill: "#fff", stroke: "#0e7490", strokeWidth: 2 }}
+                  activeDot={{ r: 6, fill: "#0e7490" }}
+                />
+              </LineChart>
+            </ChartContainer>
+
+            {/* Critical Alerts Panel */}
+            <div className="clay-card col-span-3 p-6">
+              <div className="mb-4">
+                <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-[0.1em] flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-rose-500 animate-pulse" />
+                  Critical Alerts
+                </h3>
+              </div>
+              <div className="space-y-3 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
+                {alerts.length > 0 ? (
+                  alerts.map((alert) => (
+                    <div
+                      key={alert.id}
+                      className={cn(
+                        "flex items-start gap-3 p-3 rounded-xl border-l-4 bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors",
+                        alert.type === 'critical' ? 'border-l-rose-500' : 'border-l-amber-500'
+                      )}
+                    >
+                      <div className="flex-1 space-y-1">
+                        <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 leading-none">
+                          {alert.message}
+                        </p>
+                        <p className="text-[11px] text-slate-400">
+                          {alert.time}
+                        </p>
+                      </div>
+                      {alert.type === 'critical' && (
+                        <span className="relative flex h-2 w-2 mt-1.5">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+                        </span>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8 text-slate-400">
+                    <CheckCircle2 className="h-8 w-8 mx-auto mb-2 opacity-50 text-emerald-500" />
+                    <p>No active alerts</p>
+                  </div>
+                )}
+                <Button variant="outline" className="w-full text-xs h-8 rounded-xl border-slate-200 text-slate-500 hover:text-cyan-700 hover:border-cyan-200">
+                  View All Alerts
+                </Button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }

@@ -4,6 +4,7 @@ import * as React from "react"
 import { useSearchParams } from "next/navigation"
 import { PatientDetails } from "@/components/triage/PatientDetails"
 import { DepartmentRecommendations } from "@/components/triage/DepartmentRecommendations"
+import { ResourceStatus } from "@/components/triage/ResourceStatus"
 import { mockPatients, type Patient } from "@/lib/mockData"
 
 export default function TriagePage() {
@@ -75,9 +76,9 @@ export default function TriagePage() {
     }, [selectedPatient])
 
     return (
-        <div className="relative h-screen bg-background bg-grid-pattern p-6 flex flex-col overflow-hidden">
+        <div className="relative min-h-screen bg-background bg-grid-pattern p-6 flex flex-col">
             {/* Floating Glass Header */}
-            <header className="flex-shrink-0 z-30 backdrop-blur-xl bg-background/70 border border-white/10 shadow-2xl rounded-2xl p-4 mb-6 flex flex-col md:flex-row justify-between items-center gap-6 transition-all duration-300 hover:shadow-primary/5 hover:border-primary/20">
+            <header className="sticky top-0 z-50 flex-shrink-0 backdrop-blur-xl bg-background/70 border border-white/10 shadow-2xl rounded-2xl p-4 mb-6 flex flex-col md:flex-row justify-between items-center gap-6 transition-all duration-300 hover:shadow-primary/5 hover:border-primary/20">
                 <div className="flex items-center gap-6">
                     <div className="relative">
                         <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full" />
@@ -117,8 +118,11 @@ export default function TriagePage() {
                 </div>
 
                 {/* Right Panel: Recommendations */}
-                <div className="lg:col-span-4 bg-card/30 backdrop-blur-sm border border-white/5 rounded-3xl overflow-y-auto shadow-2xl">
-                    <DepartmentRecommendations recommendedDept={recommendedDeptId} />
+                <div className="lg:col-span-4 space-y-6 overflow-y-auto">
+                    <ResourceStatus />
+                    <div className="bg-card/30 backdrop-blur-sm border border-white/5 rounded-3xl overflow-hidden shadow-2xl">
+                        <DepartmentRecommendations recommendedDept={recommendedDeptId} />
+                    </div>
                 </div>
             </div>
         </div>

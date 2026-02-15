@@ -29,6 +29,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 // Triage Components
 import { PatientDetails } from "@/components/triage/PatientDetails"
+import { SimpleTooltip } from "@/components/ui/simple-tooltip"
+import { getContributingFactors } from "@/lib/triageUtils"
 
 import { mockPatients, type Patient } from "@/lib/mockData"
 
@@ -297,7 +299,28 @@ export default function PatientsPage() {
                                     <TableCell>
                                         {getStatusBadge(patient.id)}
                                     </TableCell>
-                                    <TableCell className="font-mono font-bold text-cyan-700">{patient.priorityScore}</TableCell>
+                                    <TableCell className="font-mono font-bold text-cyan-700">
+                                        <SimpleTooltip className="cursor-help" content={
+                                            <div className="space-y-1 min-w-[200px]">
+                                                <div className="font-bold text-xs uppercase tracking-wider text-slate-400 border-b border-slate-700 pb-1 mb-2">
+                                                    Why this Priority?
+                                                </div>
+                                                {getContributingFactors(patient).slice(0, 3).map((f, i) => (
+                                                    <div key={i} className="flex justify-between items-center gap-4 text-xs">
+                                                        <span className="text-slate-300">{f.name}</span>
+                                                        <span className={cn("font-mono", f.isPositive ? "text-emerald-400" : "text-rose-400")}>{f.value}</span>
+                                                    </div>
+                                                ))}
+                                                <div className="pt-2 mt-1 border-t border-slate-800 text-[10px] text-slate-500 text-center">
+                                                    Click to view full analysis
+                                                </div>
+                                            </div>
+                                        }>
+                                            <span className="border-b border-dotted border-cyan-400/50 hover:border-cyan-600 transition-colors">
+                                                {patient.priorityScore}
+                                            </span>
+                                        </SimpleTooltip>
+                                    </TableCell>
                                     <TableCell>
                                         <span className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ring-1 ring-inset ring-cyan-600/10 text-cyan-700 bg-cyan-50">
                                             {patient.waitingTime}m

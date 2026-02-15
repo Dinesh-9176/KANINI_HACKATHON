@@ -2,13 +2,23 @@
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 
 from app.routes.triage import router as triage_router
+from app.routes import dashboard
+from app.init_db import init_db
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Initialize DB on startup
+    init_db()
+    yield
 
 app = FastAPI(
     title="AI Triage API",
     description="AI-powered patient triage prediction system",
     version="1.0.0",
+    lifespan=lifespan
 )
 
 # CORS middleware for frontend communication
@@ -22,6 +32,7 @@ app.add_middleware(
 
 # Include routes
 app.include_router(triage_router, prefix="/api")
+app.include_router(dashboard.router, prefix="/api")
 
 
 @app.get("/")
