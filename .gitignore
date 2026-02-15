@@ -30,3 +30,13 @@ next-env.d.ts
 
 # datasets (large files)
 backend/dataset/
+
+# python
+__pycache__/
+*.pyc
+.venv/
+env/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
