@@ -170,11 +170,77 @@ export default function PatientIntakePage() {
         e.preventDefault()
         setIsSubmitting(true)
 
-        // Simulate AI triage processing
-        await new Promise(resolve => setTimeout(resolve, 2000))
+        try {
+            // Prepare payload for backend
+            const payload = {
+                name: formData.name,
+                age: parseInt(formData.age) || 0,
+                gender: formData.gender,
+                blood_pressure_systolic: parseInt(formData.bloodPressureSystolic) || 120,
+                blood_pressure_diastolic: parseInt(formData.bloodPressureDiastolic) || 80,
+                heart_rate: parseInt(formData.heartRate) || 80,
+                temperature: parseFloat(formData.temperature) || 98.6,
+                oxygen_saturation: parseInt(formData.oxygenSaturation) || 98,
+                respiratory_rate: parseInt(formData.respiratoryRate) || 16,
+                symptoms: formData.symptoms,
+                conditions: formData.conditions,
+                notes: formData.notes
+            }
 
-        // Navigate to triage page with result
-        router.push("/triage")
+            const response = await fetch('http://localhost:8000/api/triage', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload),
+            })
+
+            if (!response.ok) {
+                throw new Error('Failed to submit triage data')
+            }
+
+            const data = await response.json()
+
+            // Transform backend response to frontend Patient interface
+            const patientData = {
+                id: data.patient_id,
+                name: data.name,
+                age: data.age,
+                gender: data.gender,
+                riskLevel: data.risk_level, // backend: "high" | "medium" | "low"
+                priorityScore: data.priority_score,
+                waitingTime: data.waiting_time,
+                department: data.department,
+                confidence: data.confidence,
+                symptoms: formData.symptoms, // Carry over from input
+                vitals: {
+                    hr: parseInt(data.vitals.heartRate) || 0,
+                    bp: data.vitals.bloodPressure, // Backend sends "120/80" string
+                    spo2: parseInt(data.vitals.oxygenSaturation) || 0,
+                    temp: parseFloat(data.vitals.temperature) || 0
+                },
+                // Backend AI analysis data
+                contributingFactors: data.contributing_factors?.map((f: any) => ({
+                    name: f.name,
+                    value: f.value,
+                    impact: f.impact,
+                    isPositive: f.isPositive ?? f.is_positive
+                })) || [],
+                predictedDisease: data.predicted_disease
+            }
+
+            // Save to local storage for the Triage page to access
+            localStorage.setItem("latestPatient", JSON.stringify(patientData))
+
+            // Navigate to triage page with special ID
+            router.push("/triage?id=latest")
+
+        } catch (error) {
+            console.error(error)
+            alert("Failed to process triage request. Please try again.")
+        } finally {
+            setIsSubmitting(false)
+        }
     }
 
     const isFormValid = () => {

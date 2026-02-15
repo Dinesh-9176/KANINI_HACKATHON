@@ -1,3 +1,10 @@
+export interface ContributingFactor {
+    name: string
+    value: string
+    impact: number // 0-100
+    isPositive: boolean
+}
+
 export interface Patient {
     id: string
     name: string
@@ -15,6 +22,9 @@ export interface Patient {
         spo2: number
         temp: number
     }
+    // Optional fields from backend API
+    contributingFactors?: ContributingFactor[]
+    predictedDisease?: string
 }
 
 export const mockPatients: Patient[] = [

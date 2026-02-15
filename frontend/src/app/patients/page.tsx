@@ -16,14 +16,37 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-// Icons removed
-// Icons removed
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+    DialogFooter,
+    DialogClose,
+} from "@/components/ui/dialog"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 // Triage Components
 import { PatientDetails } from "@/components/triage/PatientDetails"
 
 import { mockPatients, type Patient } from "@/lib/mockData"
+
+// Status type for patient tracking
+interface PatientStatus {
+    attended?: boolean
+    transferred?: boolean
+    transferDept?: string
+}
+
+function getPatientStatuses(): Record<string, PatientStatus> {
+    try {
+        const saved = localStorage.getItem('patientStatuses')
+        return saved ? JSON.parse(saved) : {}
+    } catch {
+        return {}
+    }
+}
 
 export default function PatientsPage() {
     const searchParams = useSearchParams()
@@ -36,9 +59,41 @@ export default function PatientsPage() {
     const [deptFilter, setDeptFilter] = React.useState("all")
     const [riskFilter, setRiskFilter] = React.useState("all")
 
+    // Removable patient list
+    const [removedIds, setRemovedIds] = React.useState<Set<string>>(new Set())
+    const [removeDialogId, setRemoveDialogId] = React.useState<string | null>(null)
+
+    // Patient statuses from localStorage
+    const [statuses, setStatuses] = React.useState<Record<string, PatientStatus>>({})
+
+    // Load statuses from localStorage on mount and periodically
+    React.useEffect(() => {
+        setStatuses(getPatientStatuses())
+        const interval = setInterval(() => {
+            setStatuses(getPatientStatuses())
+        }, 2000) // Poll every 2s to sync with triage page changes
+        return () => clearInterval(interval)
+    }, [])
+
+    // Build the combined patient list (mock + latest from intake)
+    const allPatients = React.useMemo(() => {
+        const list = [...mockPatients]
+        try {
+            const saved = localStorage.getItem('latestPatient')
+            if (saved) {
+                const latest = JSON.parse(saved) as Patient
+                // Only add if not already in mock data
+                if (!list.find(p => p.id === latest.id)) {
+                    list.unshift(latest) // Add to top
+                }
+            }
+        } catch { /* ignore */ }
+        return list
+    }, [])
+
     // Derived Logic
     const filteredAndSortedPatients = React.useMemo(() => {
-        let result = [...mockPatients]
+        let result = allPatients.filter(p => !removedIds.has(p.id))
 
         // 1. Search (Name or ID)
         if (searchTerm) {
@@ -63,12 +118,6 @@ export default function PatientsPage() {
         result.sort((a, b) => {
             switch (sortBy) {
                 case "priority":
-                    // Assuming high priority score is top
-                    // If priority strings were used, we'd map them. Here we use 'priorityScore' which is likely number?
-                    // Let's check mockData. Ah, mockData isn't visible, assuming 'priorityScore' is number or string.
-                    // If string "High", "Critical", etc, we need a map. 
-                    // Let's assume 'priorityScore' is a number from previous context.
-                    // Wait, previous table showed "priorityScore".
                     return (b.priorityScore || 0) - (a.priorityScore || 0)
                 case "waiting":
                     return b.waitingTime - a.waitingTime
@@ -80,29 +129,58 @@ export default function PatientsPage() {
         })
 
         return result
-    }, [searchTerm, deptFilter, riskFilter, sortBy])
+    }, [allPatients, removedIds, searchTerm, deptFilter, riskFilter, sortBy])
 
-    const handleRemovePatient = (e: React.MouseEvent, id: string) => {
-        // In a real app, this would verify via API. Here we can't easily mutate the import without setState wrapper.
-        // For now, let's just log or ignore, or we would need a local state copy of initial mockPatients.
-        // The previous code had `setPatientsList`. I will restore that pattern but initialize with filtered.
-        // Actually, `setPatientsList` makes filtering harder if we want persistent filters on the full set.
-        // Let's keep `mockPatients` as source of truth for this demo and filter it.
-        // If we want deletion, we need a local state `patients` initialized with `mockPatients`.
-        console.log("Remove", id)
+    const handleRemovePatient = (patientId: string) => {
+        setRemovedIds(prev => new Set(prev).add(patientId))
+        setRemoveDialogId(null)
+    }
+
+    const handleViewPatient = (e: React.MouseEvent, patientId: string) => {
+        e.stopPropagation()
+        router.push(`/triage?id=${patientId}`)
     }
 
     // Find selected patient if ID is present
     const selectedPatient = React.useMemo(() => {
         if (!id) return undefined
-        return filteredAndSortedPatients.find((p) => p.id === id) || mockPatients.find((p) => p.id === id)
-    }, [id, filteredAndSortedPatients])
+        return allPatients.find((p) => p.id === id)
+    }, [id, allPatients])
 
     // Get unique departments for filter dropdown
     const uniqueDepartments = React.useMemo(() => {
-        const depts = new Set(mockPatients.map(p => p.department))
+        const depts = new Set(allPatients.map(p => p.department))
         return Array.from(depts)
-    }, [])
+    }, [allPatients])
+
+    // Get status badge for a patient
+    const getStatusBadge = (patientId: string) => {
+        const status = statuses[patientId]
+        if (status?.transferred) {
+            return (
+                <Badge className="rounded-full px-3 py-0.5 font-bold shadow-sm bg-blue-100 text-blue-700 hover:bg-blue-200 border-0">
+                    <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                    Transferred
+                </Badge>
+            )
+        }
+        if (status?.attended) {
+            return (
+                <Badge className="rounded-full px-3 py-0.5 font-bold shadow-sm bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-0">
+                    <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                    Attended
+                </Badge>
+            )
+        }
+        return (
+            <Badge variant="secondary" className="rounded-full px-3 py-0.5 font-bold shadow-sm bg-amber-50 text-amber-600 hover:bg-amber-100 border-0">
+                Pending
+            </Badge>
+        )
+    }
+
+    // Patient removed name for dialog
+    const patientToRemove = removeDialogId ? allPatients.find(p => p.id === removeDialogId) : null
 
     // --- VIEW: Patient Details (Triage) ---
     if (selectedPatient) {
@@ -194,6 +272,7 @@ export default function PatientsPage() {
                                 <TableHead className="font-bold text-cyan-900 uppercase text-xs tracking-wider">Age</TableHead>
                                 <TableHead className="font-bold text-cyan-900 uppercase text-xs tracking-wider">Department</TableHead>
                                 <TableHead className="font-bold text-cyan-900 uppercase text-xs tracking-wider">Risk Level</TableHead>
+                                <TableHead className="font-bold text-cyan-900 uppercase text-xs tracking-wider">Status</TableHead>
                                 <TableHead className="font-bold text-cyan-900 uppercase text-xs tracking-wider">Priority</TableHead>
                                 <TableHead className="font-bold text-cyan-900 uppercase text-xs tracking-wider">Wait Time</TableHead>
                                 <TableHead className="text-right font-bold text-cyan-900 uppercase text-xs tracking-wider">Actions</TableHead>
@@ -204,7 +283,7 @@ export default function PatientsPage() {
                                 <TableRow
                                     key={patient.id}
                                     className="border-slate-100 hover:bg-cyan-50/30 cursor-pointer transition-all duration-200"
-                                    onClick={() => router.push(`/patients?id=${patient.id}`)}
+                                    onClick={() => router.push(`/triage?id=${patient.id}`)}
                                 >
                                     <TableCell className="font-bold text-slate-600">#{patient.id}</TableCell>
                                     <TableCell className="font-semibold text-slate-800">{patient.name}</TableCell>
@@ -215,6 +294,9 @@ export default function PatientsPage() {
                                             {patient.riskLevel.toUpperCase()}
                                         </Badge>
                                     </TableCell>
+                                    <TableCell>
+                                        {getStatusBadge(patient.id)}
+                                    </TableCell>
                                     <TableCell className="font-mono font-bold text-cyan-700">{patient.priorityScore}</TableCell>
                                     <TableCell>
                                         <span className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ring-1 ring-inset ring-cyan-600/10 text-cyan-700 bg-cyan-50">
@@ -223,10 +305,23 @@ export default function PatientsPage() {
                                     </TableCell>
                                     <TableCell className="text-right">
                                         <div className="flex justify-end gap-2">
-                                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 rounded-full hover:bg-cyan-100 text-cyan-600" onClick={(e) => { e.stopPropagation(); /* Add logic */ }}>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-8 px-3 rounded-lg hover:bg-cyan-100 text-cyan-600 text-xs font-semibold"
+                                                onClick={(e) => handleViewPatient(e, patient.id)}
+                                            >
                                                 View
                                             </Button>
-                                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 rounded-full hover:bg-rose-100 text-rose-500" onClick={(e) => handleRemovePatient(e, patient.id)}>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-8 px-3 rounded-lg hover:bg-rose-100 text-rose-500 text-xs font-semibold"
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    setRemoveDialogId(patient.id)
+                                                }}
+                                            >
                                                 Remove
                                             </Button>
                                         </div>
@@ -237,12 +332,49 @@ export default function PatientsPage() {
                     </Table>
                 </div>
 
+                {/* Empty State */}
+                {filteredAndSortedPatients.length === 0 && (
+                    <div className="text-center py-12 text-slate-400">
+                        <p className="text-lg font-semibold mb-1">No patients found</p>
+                        <p className="text-sm">Try adjusting your search or filters.</p>
+                    </div>
+                )}
+
                 {/* Pagination Mockup */}
-                <div className="flex items-center justify-end space-x-2 py-6">
-                    <Button variant="outline" size="sm" disabled className="rounded-xl border-slate-200 text-slate-400">Previous</Button>
-                    <Button variant="outline" size="sm" className="rounded-xl border-slate-200 text-slate-600 hover:text-cyan-700 hover:border-cyan-200 hover:bg-cyan-50">Next</Button>
+                <div className="flex items-center justify-between py-6">
+                    <span className="text-sm text-slate-500 font-medium">
+                        Showing {filteredAndSortedPatients.length} of {allPatients.length - removedIds.size} patients
+                    </span>
+                    <div className="flex gap-2">
+                        <Button variant="outline" size="sm" disabled className="rounded-xl border-slate-200 text-slate-400">Previous</Button>
+                        <Button variant="outline" size="sm" className="rounded-xl border-slate-200 text-slate-600 hover:text-cyan-700 hover:border-cyan-200 hover:bg-cyan-50">Next</Button>
+                    </div>
                 </div>
             </div>
+
+            {/* Remove Confirmation Dialog */}
+            <Dialog open={removeDialogId !== null} onOpenChange={(open) => { if (!open) setRemoveDialogId(null) }}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Remove Patient</DialogTitle>
+                        <DialogDescription>
+                            Are you sure you want to remove <span className="font-semibold text-foreground">{patientToRemove?.name}</span> from the patient directory? This action cannot be undone.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="gap-3 sm:gap-3">
+                        <DialogClose asChild>
+                            <Button variant="outline">Cancel</Button>
+                        </DialogClose>
+                        <Button
+                            variant="destructive"
+                            onClick={() => removeDialogId && handleRemovePatient(removeDialogId)}
+                            className="bg-rose-600 hover:bg-rose-500"
+                        >
+                            Remove Patient
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }

@@ -4,22 +4,41 @@ import * as React from "react"
 import { useSearchParams } from "next/navigation"
 import { PatientDetails } from "@/components/triage/PatientDetails"
 import { DepartmentRecommendations } from "@/components/triage/DepartmentRecommendations"
-import { mockPatients } from "@/lib/mockData"
+import { mockPatients, type Patient } from "@/lib/mockData"
 
 export default function TriagePage() {
     const searchParams = useSearchParams()
     const id = searchParams.get("id")
+    const [selectedPatient, setSelectedPatient] = React.useState<Patient | undefined>(undefined)
 
-    // Default to first patient if no ID
-    const selectedPatient = React.useMemo(
-        () => {
-            if (id) {
-                return mockPatients.find((p) => p.id === id) || mockPatients[0]
+    React.useEffect(() => {
+        const loadPatient = () => {
+            if (id === 'latest') {
+                try {
+                    const saved = localStorage.getItem('latestPatient')
+                    if (saved) {
+                        setSelectedPatient(JSON.parse(saved))
+                        return
+                    }
+                } catch (e) {
+                    console.error("Failed to load patient from storage", e)
+                }
             }
-            return mockPatients[0]
-        },
-        [id]
-    )
+
+            if (id) {
+                const found = mockPatients.find((p) => p.id === id)
+                if (found) {
+                    setSelectedPatient(found)
+                    return
+                }
+            }
+
+            // Fallback
+            setSelectedPatient(mockPatients[0])
+        }
+
+        loadPatient()
+    }, [id])
 
     // Get the department ID for recommendations
     const recommendedDeptId = React.useMemo(() => {
@@ -27,19 +46,38 @@ export default function TriagePage() {
         const deptMap: Record<string, string> = {
             "Cardiology": "cardiology",
             "Emergency": "emergency",
-            "General": "general",
+            "Emergency / ICU": "emergency",
+            "General Medicine": "general",
             "Neurology": "neurology",
             "Orthopedics": "orthopedics",
-            "Pediatrics": "pediatrics",
-            "Respiratory": "pulmonology"
+            "Pediatrics": "pediatrics_geriatrics",
+            "Pediatrics / Geriatrics": "pediatrics_geriatrics",
+            "Pulmonology": "pulmonology",
+            "Respiratory": "pulmonology",
+            "Gastroenterology": "gastroenterology",
+            "Dermatology": "dermatology",
+            "Nephrology": "nephrology",
+            "Psychiatry": "psychiatry",
+            "ENT": "ent",
+            "Urology": "urology",
+            "Endocrinology": "endocrinology",
+            "Infectious Disease": "infectious",
+            "Trauma": "trauma",
+            "OB-GYN": "obgyn",
+            "Gynecology": "obgyn",
+            "Hematology": "general",
+            "Oncology": "general",
+            "Rheumatology": "general",
+            "Ophthalmology": "general",
+            "Physiotherapy": "physiotherapy",
         }
-        return deptMap[selectedPatient.department]
+        return deptMap[selectedPatient.department] || "general"
     }, [selectedPatient])
 
     return (
-        <div className="relative min-h-screen bg-background bg-grid-pattern p-6 overflow-y-auto">
+        <div className="relative h-screen bg-background bg-grid-pattern p-6 flex flex-col overflow-hidden">
             {/* Floating Glass Header */}
-            <header className="sticky top-0 z-50 backdrop-blur-xl bg-background/70 border border-white/10 shadow-2xl rounded-2xl p-4 mb-6 flex flex-col md:flex-row justify-between items-center gap-6 transition-all duration-300 hover:shadow-primary/5 hover:border-primary/20">
+            <header className="flex-shrink-0 z-30 backdrop-blur-xl bg-background/70 border border-white/10 shadow-2xl rounded-2xl p-4 mb-6 flex flex-col md:flex-row justify-between items-center gap-6 transition-all duration-300 hover:shadow-primary/5 hover:border-primary/20">
                 <div className="flex items-center gap-6">
                     <div className="relative">
                         <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full" />
@@ -72,14 +110,14 @@ export default function TriagePage() {
                 </div>
             </header>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-140px)]">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 min-h-0">
                 {/* Left Panel: Patient Details */}
                 <div className="lg:col-span-8 bg-card/30 backdrop-blur-sm border border-white/5 rounded-3xl overflow-hidden shadow-2xl">
                     <PatientDetails patient={selectedPatient} />
                 </div>
 
                 {/* Right Panel: Recommendations */}
-                <div className="lg:col-span-4 bg-card/30 backdrop-blur-sm border border-white/5 rounded-3xl overflow-hidden shadow-2xl">
+                <div className="lg:col-span-4 bg-card/30 backdrop-blur-sm border border-white/5 rounded-3xl overflow-y-auto shadow-2xl">
                     <DepartmentRecommendations recommendedDept={recommendedDeptId} />
                 </div>
             </div>
